@@ -8,14 +8,12 @@ ADMIN_PASSWORD = "gazelleadmin123"
 
 def get_real_gold_price():
     try:
-        # Free gold API - no key
         r = requests.get("https://api.gold-api.com/price/XAU", timeout=5)
         data = r.json()
         price = float(data.get('price', 2650))
         return round(price, 2)
     except:
         try:
-            # Backup API
             r = requests.get("https://api.metals.live/v1/spot/XAU", timeout=5)
             price = r.json()[0]['price'] if isinstance(r.json(), list) else r.json().get('price', 2650)
             return round(float(price),2)
@@ -105,8 +103,34 @@ def login():
         if row:
             session['user']=row[1]; session['email']=row[2]
             return redirect('/dashboard')
-        return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong login</h2><a href='/login'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><a href='/google-login'><button class='google-btn'>🔵 Login with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/forgot'>Forgot Password?</a><a href='/register'>Register</a></div></body></html>"
+        return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong login - Try Master Reset below</h2><a href='/master-reset'><button style='background:#ff4444'>🔧 Master Reset Password</button></a><br><br><a href='/login'>Try again</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><a href='/google-login'><button class='google-btn'>🔵 Login with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/forgot'>Forgot Password?</a> | <a href='/master-reset'>Master Reset</a><br><br><a href='/register'>Register</a></div></body></html>"
+
+# MASTER RESET - NEW
+@app.route('/master-reset', methods=['GET','POST'])
+def master_reset():
+    if request.method == 'POST':
+        email = request.form['email']
+        new_pass = request.form['new_password']
+        conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=?", (email,))
+        user = c.fetchone()
+        if user:
+            c.execute("UPDATE users SET password=? WHERE email=?", (new_pass, email))
+            conn.commit(); conn.close()
+            return f"<html><head>{CSS}</head><body><div class='box'><h2>✅ Password Fixed!</h2><p>Email: {email}</p><p>New password set.</p><a href='/login'><button>Login Now</button></a></div></body></html>"
+        else:
+            # If email not found, create new user with that email
+            username = email.split('@')[0]
+            try:
+                c.execute("INSERT INTO users (username,email,password,balance,subscribed) VALUES (?,?,?,?,0)", (username,email,new_pass,100))
+                conn.commit()
+                conn.close()
+                return f"<html><head>{CSS}</head><body><div class='box'><h2>✅ New Account Created!</h2><p>Email {email} was not found, so I created it.</p><p>Username: {username}</p><a href='/login'><button>Login Now</button></a></div></body></html>"
+            except:
+                conn.close()
+                return f"<html><head>{CSS}</head><body><div class='box'><h2>Email not found and username taken</h2><a href='/master-reset'>Try different email</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>🔧 Master Password Reset</h2><p style='font-size:12px;color:#888'>Enter your email and new password - works even if account wiped</p><form method='post'><input name='email' type='email' placeholder='Your email (e.g. you@gmail.com)' required><input name='new_password' type='password' placeholder='New Password' required><button>Reset / Create Account</button></form><a href='/login'>Back to Login</a></div></body></html>"
 
 @app.route('/google-login')
 def google_login():
@@ -133,8 +157,8 @@ def forgot():
         user = c.fetchone(); conn.close()
         if user:
             return f"<html><head>{CSS}</head><body><div class='box'><h2>Reset Password</h2><form method='post' action='/reset-password'><input type='hidden' name='email' value='{email}'><input name='new_password' type='password' placeholder='New Password' required><button>Reset</button></form></div></body></html>"
-        return f"<html><head>{CSS}</head><body><div class='box'><h2>Email not found</h2><a href='/forgot'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Forgot Password</h2><form method='post'><input name='email' type='email' placeholder='Your email' required><button>Find Account</button></form><a href='/login'>Back</a></div></body></html>"
+        return f"<html><head>{CSS}</head><body><div class='box'><h2>Email not found - Use Master Reset</h2><a href='/master-reset'><button>Go to Master Reset</button></a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Forgot Password</h2><form method='post'><input name='email' type='email' placeholder='Your email' required><button>Find Account</button></form><a href='/master-reset'>Use Master Reset Instead</a><br><br><a href='/login'>Back</a></div></body></html>"
 
 @app.route('/reset-password', methods=['POST'])
 def reset_password():
@@ -158,20 +182,18 @@ def admin():
     users = c.fetchall()
     conn.close()
     rows = "".join([f"<tr><td>{u[0]}</td><td>{u[1]}</td><td>{u[2]}</td><td>${u[3]}</td><td>{'✅' if u[4] else '❌'}</td></tr>" for u in users])
-    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:700px;margin:20px auto;padding:15px'><h1>ADMIN - Gold ${get_real_gold_price()}</h1><div class='box' style='max-width:700px'><table><tr><th>ID</th><th>User</th><th>Email</th><th>Bal</th><th>Sub</th></tr>{rows}</table><a href='/'>Home</a></div></div></body></html>"
+    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:700px;margin:20px auto;padding:15px'><h1>ADMIN - Gold ${get_real_gold_price()}</h1><div class='box' style='max-width:700px'><table><tr><th>ID</th><th>User</th><th>Email</th><th>Bal</th><th>Sub</th></tr>{rows}</table><p><a href='/master-reset'>Master Reset Tool</a></p><a href='/'>Home</a></div></div></body></html>"
 
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session: return redirect('/login')
     u = session['user']
     gold_price = get_real_gold_price()
-
     conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
     c.execute("SELECT balance FROM users WHERE username=?", (u,))
     row = c.fetchone()
     if not row: return redirect('/logout')
     bal = row[0]
-    # Realistic profit based on gold movement simulation
     change = random.choice([0.8, 1.2, -0.5, 1.5, 0.9])
     bal = round(bal * (1 + change/100), 2)
     c.execute("UPDATE users SET balance=? WHERE username=?", (bal, u))
@@ -185,7 +207,6 @@ def dashboard():
     conn.close()
     profit = round(bal-100,2)
     trades_html = "".join([f"<p style='font-size:13px'>{t[0]}</p>" for t in trades])
-
     return f"""<html><head>{CSS}</head><body style='display:block'>
     <div style='max-width:500px;margin:15px auto'>
         <h1 style='text-align:center'>DASHBOARD</h1>
@@ -193,7 +214,6 @@ def dashboard():
         <div class='box' style='max-width:500px;margin-bottom:15px;border:1px solid gold'>
             <p style='color:#888;font-size:11px;margin:0'>LIVE GOLD PRICE</p>
             <h2 style='color:gold;font-size:28px;margin:5px 0'>${gold_price}</h2>
-            <p style='font-size:11px;color:#555'>Real-time from Gold API</p>
         </div>
         <div class='box' style='max-width:500px;margin-bottom:15px'>
             <h2 style='color:#00ff88;font-size:32px'>${bal}</h2><p>Profit: ${profit}</p>
