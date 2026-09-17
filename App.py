@@ -1,300 +1,146 @@
-from flask import Flask, request, redirect, session, send_from_directory
-import sqlite3, random, datetime, os
-import requests
+from flask import Flask, request, redirect, session, render_template_string
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "gazelle2026_secure")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "gazelleadmin123")
+app.secret_key = "gazelle-flw-2026-v2"
 
-@app.route('/sw.js')
-def serve_sw():
-    return send_from_directory('.', 'sw.js')
+PAY_LINK = "https://flutterwave.com/pay/msjgnmx4gehc"
 
-def get_real_gold_price():
-    try:
-        r = requests.get("https://api.gold-api.com/price/XAU", timeout=3)
-        price = float(r.json().get('price', 4286))
-        return round(price, 2)
-    except:
-        return round(random.uniform(4285, 4305),2)
-
-def init_db():
-    conn = sqlite3.connect('gazelle.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, email TEXT UNIQUE, password TEXT, balance REAL, real_balance REAL DEFAULT 0, subscribed INTEGER DEFAULT 0, broker TEXT DEFAULT '', mt5_login TEXT DEFAULT '', mt5_password TEXT DEFAULT '', mt5_server TEXT DEFAULT '', mt5_connected INTEGER DEFAULT 0, risk TEXT DEFAULT '0.05')''')
-    c.execute('''CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY, username TEXT, trade TEXT)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-last_prices = []
-def add_price(price):
-    last_prices.append(price)
-    if len(last_prices) > 250: last_prices.pop(0)
-
-def calc_ema_real(prices, period):
-    if not prices: return 4292.0
-    if len(prices) < period: return sum(prices) / len(prices)
-    sma = sum(prices[:period]) / period
-    k = 2 / (period + 1)
-    ema = sma
-    for p in prices[period:]: ema = (p * k) + (ema * (1 - k))
-    return ema
-
-def calc_signal_logic():
-    if len(last_prices) < 50: return "ANALYZING", None
-    ema50 = calc_ema_real(last_prices, 50)
-    ema200 = calc_ema_real(last_prices, len(last_prices) if len(last_prices)<200 else 200)
-    rsi = 50
-    if len(last_prices)>=15:
-        gains=0; losses=0
-        for i in range(len(last_prices)-14, len(last_prices)):
-            ch = last_prices[i]-last_prices[i-1]
-            if ch>0: gains+=ch
-            else: losses+=abs(ch)
-        rs = (gains/14)/(losses/14 if losses!=0 else 0.01)
-        rsi = 100-(100/(1+rs))
-    if ema50 > ema200 and rsi < 68 and rsi > 40: return "BULLISH", "BUY"
-    elif ema50 < ema200 and rsi > 32 and rsi < 60: return "BEARISH", "SELL"
-    else: return "WAITING", None
-
-CSS = """
-<meta name="viewport" content="width=device-width,initial-scale=1">
+BASE_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 <style>
-body{background:#000;color:#fff;font-family:Arial;margin:0;padding:0}
-.navbar{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;backg:#0a0a0a;border-bottom:1px solid #222;position:sticky;top:0;z-index:100}
-.logo{color:gold;font-weight:bold;font-size:18px}
-.btn-login{border:1px solid gold;color:gold;background:transparent;padding:8px 18px;border-radius:20px;font-weight:bold;font-size:13px;text-decoration:none}
-.btn-signup{background:gold;color:#000;padding:8px 18px;border-radius:20px;font-weight:bold;font-size:13px;text-decoration:none}
-.ticker{overflow:hidden;white-space:nowrap;background:#111;border-bottom:1px solid #222;padding:8px 0}
-.ticker-content{display:inline-block;animation:scroll 40s linear infinite;font-size:12px;color:#ccc}
-.ticker-content span{margin-right:40px}
-.ticker-content b{color:#00ff88}
-@keyframes scroll{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
-.box{background:#151515;border:1px solid #222;padding:20px;border-radius:12px;width:100%;max-width:420px;margin:12px auto;box-sizing:border-box}
-input,select{width:100%;padding:14px;margin:10px 0;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-size:14px}
-button{background:gold;color:#000;padding:14px;border:none;border-radius:8px;font-weight:bold;width:100%;font-size:16px;cursor:pointer}
-h1{color:gold;text-align:center} h2{color:gold} a{color:gold;text-decoration:none}
-.hero{max-width:800px;margin:0 auto;padding:15px;text-align:center}
-.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:15px 0}
-.stat{background:#111;border:1px solid #222;border-radius:10px;padding:12px}
-.stat h2{margin:0;color:#00ff88;font-size:16px}
-.stat p{margin:4px 0 0 0;color:#888;font-size:9px}
-.news-section{max-width:500px;margin:10px auto;padding:0 15px;text-align:left}
-.news-card{background:#0e0e0e;border:1px solid #222;border-left:3px solid gold;border-radius:8px;padding:12px;margin-bottom:10px}
-.broker-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0}
-.broker-card{background:#111;border:1px solid #222;border-radius:8px;padding:10px;text-align:center;font-size:10px}
+*{font-family:'Inter',system-ui;box-sizing:border-box}
+body{margin:0;background:#fff;color:#0a1931;padding-bottom:90px}
+.top{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:10}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
+.logo-icon{width:32px;height:32px;background:#0a1931;color:#f7c948;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900}
+.search{margin:14px 16px;background:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center}
+.search input{border:none;outline:none;background:transparent;width:100%;font-size:14px}
+.tabs{margin:16px;display:flex;gap:10px}
+.tab{padding:10px 20px;border-radius:24px;font-weight:700;border:none;font-size:14px;cursor:pointer;text-decoration:none}
+.tab-active{background:#0a1931;color:#fff}
+.tab-inactive{background:#eeeeef;color:#8a8a8a}
+.card{margin:16px;border-radius:16px;padding:18px}
+.card-mint{border:1.5px solid #b7e1c5;background:#eef9f1}
+.card-white{border:1px solid #eee;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.04)}
+.card h2{margin:0;font-size:19px;font-weight:800}
+.card p{font-size:13px;color:#555;line-height:18px;margin-top:6px}
+.btn-dark{display:block;text-align:center;background:#0a1931;color:white;padding:14px;border-radius:10px;font-weight:700;text-decoration:none;margin-top:14px}
+.btn-gold{display:block;text-align:center;background:#f7c948;color:#000;padding:15px;border-radius:12px;font-weight:800;text-decoration:none}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #eee;display:flex;justify-content:space-around;padding:10px 0 18px}
+.nav-item{text-align:center;font-size:11px;color:#999;text-decoration:none}
+.nav-item.active{color:#0a1931;font-weight:700}
+.signal-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5;font-size:13px}
+.badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.badge-buy{background:#eef9f1;color:#0a7a2f}
 </style>
+</head>
+<body>
+
+<div class="top">
+  <div class="logo"><div class="logo-icon">G</div> Gazelle VIP</div>
+  <a href="/account" style="background:#eee;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none">👤</a>
+</div>
+
+<div class="search"><span>🔍</span><input placeholder="Search signals, pairs, analysis"></div>
+
+<div class="tabs">
+  <a href="/" class="tab {{'tab-active' if page=='signals' else 'tab-inactive'}}">Signals</a>
+  <a href="/analysis" class="tab {{'tab-active' if page=='analysis' else 'tab-inactive'}}">Analysis</a>
+  <a href="/account" class="tab {{'tab-active' if page=='account' else 'tab-inactive'}}">Account</a>
+</div>
+
+{{ content | safe }}
+
+<div class="bottom-nav">
+  <a href="/" class="nav-item {{'active' if page=='signals' else ''}}">🏠<br>Home</a>
+  <a href="/analysis" class="nav-item {{'active' if page=='analysis' else ''}}">📊<br>Portfolio</a>
+  <a href="/account" class="nav-item {{'active' if page=='account' else ''}}">👤<br>Account</a>
+</div>
+</body>
+</html>
 """
 
 @app.route('/')
 def home():
-    gold = get_real_gold_price()
-    add_price(gold)
-    now = datetime.datetime.now().strftime("%H:%M")
-    html = f"""
-    <html><head>{CSS}</head><body>
-    <div class='navbar'><div class='logo'>GAZELLE</div><div><a href='/login' class='btn-login'>Login</a> <a href='/register' class='btn-signup'>Sign Up</a></div></div>
-    <div class='ticker'><div class='ticker-content'>
-        <span>🟡 <b>XAUUSD ${gold}</b> LIVE</span>
-        <span>📈 GOLD LIVE FEED</span>
-        <span>🧪 SIMULATED FORWARD TEST</span>
-        <span>🤖 EMA 50/200 + RSI STRATEGY</span>
-        <span>🔌 ANY MT5 BROKER - XM HFM EXNESS DERIV</span>
-        <span>⚠️ DEMO MODE - NOT FINANCIAL ADVICE</span>
-    </div></div>
-    <div class='hero'>
-        <h1 style='font-size:36px;margin:10px 0'>GAZELLE CAPITAL</h1>
-        <p style='color:#00ff88;font-size:13px;font-weight:bold'>XAUUSD BOT • SIMULATED TESTING • CONNECT YOUR MT5 (DEMO)</p>
-        <div class='stats'>
-            <div class='stat'><h2>${gold}</h2><p>XAUUSD LIVE</p></div>
-            <div class='stat'><h2>SIM</h2><p>DEMO MODE</p></div>
-            <div class='stat'><h2>TEST</h2><p>FORWARD TEST</p></div>
+    vip = request.args.get('vip') or session.get('vip')
+    if vip:
+        content = """
+        <div class="card card-mint">
+          <div style="display:flex;gap:12px">
+            <div style="background:#b7e1c5;min-width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800">✓</div>
+            <div><h2>Account activated<br>successfully</h2><p>Welcome Temitope, your VIP is live. Daily signals at 8am UTC.</p></div>
+          </div>
+          <a href="/analysis" class="btn-dark">View Live Gold Chart</a>
         </div>
-        <div class='broker-grid'>
-            <div class='broker-card'>XM<br>Global</div>
-            <div class='broker-card'>HFM<br>Markets</div>
-            <div class='broker-card'>Exness<br>MT5</div>
-            <div class='broker-card'>Deriv<br>MT5</div>
-            <div class='broker-card'>FBS<br>MT5</div>
-            <div class='broker-card'>ANY<br>MT5</div>
+        <div class="card card-white">
+          <h2>Today's Signals</h2>
+          <div class="signal-row"><span>XAUUSD BUY 2035 → 2055</span><span class="badge badge-buy">+120 pips</span></div>
+          <div class="signal-row"><span>BTCUSD SELL 67k</span><span class="badge badge-buy">Running</span></div>
         </div>
-        <div class='box' style='border:2px solid gold;background:linear-gradient(135deg,#1a1a00,#000)'>
-            <h2 style='margin:0;font-size:22px'>Test The Bot With Demo</h2>
-            <p style='color:#888;font-size:12px'>$100 simulated balance • See how EMA+RSI logic performs live • Connect MT5 (credentials stored for future VPS)</p>
-            <a href='/register'><button>Start Free Demo</button></a>
-            <p style='font-size:10px;color:#666;margin-top:10px'>Have account? <a href='/login'>Login</a> • Experimental project</p>
+        """
+    else:
+        content = f"""
+        <div class="card card-white" style="text-align:center">
+          <h2>Welcome to Flutterwave for Business, temitope 👋</h2>
+          <p>We rebuilt Gazelle with same clean style you love</p>
+          <div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><span class="tab tab-active">Banking</span><span class="tab tab-inactive">Payments</span></div>
         </div>
+        <div class="card card-white">
+          <h2>VIP Access - $10/month</h2>
+          <p style="margin:10px 0">Daily verified signals + live chart + prop firm plan</p>
+          <a href="{PAY_LINK}" class="btn-gold">Subscribe - $10/month</a>
+          <p style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">Powered by Flutterwave - Your link msjgnmx4gehc</p>
+        </div>
+        """
+    return render_template_string(BASE_HTML, content=content, page='signals')
+
+@app.route('/analysis')
+def analysis():
+    content = """
+    <div class="card card-white">
+      <h2>Live XAUUSD Chart</h2>
+      <p>Real TradingView - London session analysis</p>
+      <div id="tradingview_gold" style="height:380px;margin-top:12px;border-radius:12px;overflow:hidden"></div>
+      <script>
+        new TradingView.widget({
+          "autosize": true,
+          "symbol": "OANDA:XAUUSD",
+          "interval": "60",
+          "timezone": "Africa/Lagos",
+          "theme": "light",
+          "style": "1",
+          "locale": "en",
+          "container_id": "tradingview_gold"
+        });
+      </script>
     </div>
-    <div class='news-section'>
-        <h3 style='color:gold;font-size:14px'>🔴 LIVE INFO</h3>
-        <div class='news-card'><span style='background:#222;color:#fff;padding:3px 6px;border-radius:4px;font-size:9px'>LIVE • {now}</span><h4 style='margin:5px 0;font-size:13px'>Gold Price ${gold} - Live Feed Active</h4><p style='color:#888;font-size:11px'>EMA 50/200 crossover + RSI filter running. Dashboard shows simulated trades.</p></div>
-        <div class='news-card'><span style='background:#333;color:#fff;padding:3px 6px;border-radius:4px;font-size:9px'>DEMO • SIMULATED</span><h4 style='margin:5px 0;font-size:13px'>Demo Trading Log - No Real Money Yet</h4><p style='color:#888;font-size:11px'>All profits/losses shown are simulated for strategy testing. Real MT5 execution coming via VPS.</p></div>
-        <div class='news-card'><span style='background:gold;color:#000;padding:3px 6px;border-radius:4px;font-size:9px'>HOW IT WORKS</span><h4 style='margin:5px 0;font-size:13px'>EMA + RSI Logic - Transparent</h4><p style='color:#888;font-size:11px'>No hidden AI. Code is open: EMA50>EMA200 + RSI check = BUY/SELL signal. Check GitHub README.</p></div>
+    <div class="card card-mint">
+      <h2>Today's Bias</h2>
+      <p>Gold bullish above 2035. Buy dips. SL 2025. TP 2055 / 2070. BTC consolidating - wait for breakout.</p>
     </div>
-    </body></html>
     """
-    return html
+    return render_template_string(BASE_HTML, content=content, page='analysis')
 
-@app.route('/register', methods=['GET','POST'])
-def register():
-    if request.method == 'POST':
-        u = request.form['username']; e = request.form['email']; p = request.form['password']
-        try:
-            conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-            c.execute("INSERT INTO users (username,email,password,balance,real_balance,subscribed) VALUES (?,?,?,?,?,0)", (u,e,p,100,0))
-            conn.commit(); conn.close()
-            session['user']=u; session['email']=e
-            return redirect('/dashboard')
-        except:
-            return f"<html><head>{CSS}</head><body><div class='box'><h2>Taken</h2><a href='/register'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Create Demo</h2><p style='font-size:11px;color:#888'>$100 demo simulated - connect any broker after VIP</p><form method='post'><input name='username' placeholder='Username' required><input name='email' type='email' placeholder='Email' required><input name='password' type='password' placeholder='Password' required><button>Create Demo</button></form><a href='/login'>Login</a></div></body></html>"
-
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        u = request.form['username']; p = request.form['password']
-        conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE (username=? OR email=?) AND password=?", (u,u,p))
-        row = c.fetchone(); conn.close()
-        if row:
-            session['user']=row[1]; session['email']=row[2]
-            return redirect('/dashboard')
-        return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong</h2><a href='/login'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/register'>Demo Account</a></div></body></html>"
+@app.route('/account')
+def account():
+    content = f"""
+    <div class="card card-white">
+      <h2>Account</h2>
+      <div style="margin-top:12px"><div class="signal-row"><span>Plan</span><span>$10/month</span></div><div class="signal-row"><span>Next bill</span><span>Oct 17</span></div></div>
+      <a href="{PAY_LINK}" class="btn-dark">Manage on Flutterwave</a>
+    </div>
+    """
+    return render_template_string(BASE_HTML, content=content, page='account')
 
 @app.route('/dashboard')
 def dashboard():
-    if 'user' not in session: return redirect('/login')
-    u = session['user']; gold = get_real_gold_price(); add_price(gold)
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("SELECT balance, subscribed, broker, mt5_login, mt5_server, mt5_connected, risk FROM users WHERE username=?", (u,))
-    row = c.fetchone()
-    if not row: return redirect('/logout')
-    demo_bal, is_vip, broker, mt5_login, mt5_server, mt5_connected, risk = row[0], row[1]==1, row[2], row[3], row[4], row[5]==1, row[6]
-    trend, direction = calc_signal_logic()
-    if direction is None: change=0; status="WAITING"; direction_txt="NO TRADE"
-    else:
-        win = random.random() < 0.84
-        change = random.uniform(0.8,1.7) if win else random.uniform(-0.5,-0.2)
-        status = "WIN" if win else "LOSS"; direction_txt = direction
-    if change!=0:
-        demo_bal = round(demo_bal*(1+change/100),2)
-        c.execute("UPDATE users SET balance=? WHERE username=?", (demo_bal, u))
-    now = datetime.datetime.now().strftime("%H:%M:%S")
-    trade_detail = f"[{now}] {status} Bot {direction_txt} @ ${gold} {round(change,2)}% -> ${demo_bal} [{'LIVE '+broker if is_vip and mt5_connected else 'DEMO'}]"
-    if change!=0:
-        c.execute("INSERT INTO trades VALUES (NULL,?,?)", (u, trade_detail)); conn.commit()
-    c.execute("SELECT trade FROM trades WHERE username=? ORDER BY id DESC LIMIT 10", (u,))
-    trades = c.fetchall(); conn.close()
-    trades_html = "".join([f"<p style='font-size:9px;margin:6px 0;padding:8px;background:#111;border-left:3px solid {'#00ff88' if 'WIN' in t[0] else '#ff4444'};border-radius:4px'>{t[0]}</p>" for t in trades])
-
-    if is_vip:
-        if mt5_connected:
-            xm_box = f"<div class='box' style='border:2px solid #00ff88'><h3 style='color:#00ff88'>✅ {broker} CONNECTED (SIM MODE)</h3><p style='font-size:11px'>Broker: {broker}<br>Login: {mt5_login}<br>Server: {mt5_server}<br>Risk: {risk} lot<br><br>Currently SIMULATED. Real VPS trading after domain funding.</p><form method='post' action='/update-risk'><select name='risk'><option value='0.01'>0.01 Low Risk</option><option value='0.05' {'selected' if risk=='0.05' else ''}>0.05 Medium</option><option value='0.10'>0.10 High</option><option value='0.20'>0.20 Aggressive</option></select><button>Update Risk</button></form><br><a href='/broker-disconnect'><button style='background:#ff4444'>Disconnect Broker</button></a></div>"
-        else:
-            xm_box = f"""
-            <div class='box' style='border:2px solid gold'>
-                <h3 style='color:gold'>🔌 Connect Any MT5 Broker (Demo Store)</h3>
-                <p style='font-size:10px;color:#888'>XM, HFM, Exness, Deriv, FBS, OctaFX, any MT5 - stored for future VPS</p>
-                <form method='post' action='/broker-connect'>
-                    <select name='broker' required>
-                        <option value=''>Select Broker</option>
-                        <option value='XM'>XM Global</option>
-                        <option value='HFM'>HFM (HotForex)</option>
-                        <option value='Exness'>Exness</option>
-                        <option value='Deriv'>Deriv</option>
-                        <option value='FBS'>FBS</option>
-                        <option value='OctaFX'>OctaFX</option>
-                        <option value='Other'>Other MT5 Broker</option>
-                    </select>
-                    <input name='mt5_login' placeholder='MT5 Login (e.g. 71234567)' required>
-                    <input name='mt5_password' type='password' placeholder='MT5 Trading Password' required>
-                    <input name='mt5_server' placeholder='MT5 Server (e.g. XMGlobal-MT5 2, Exness-Real)' required>
-                    <select name='risk' required>
-                        <option value='0.01'>0.01 Lot - Low Risk ($100-$300)</option>
-                        <option value='0.05' selected>0.05 Lot - Medium ($500)</option>
-                        <option value='0.10'>0.10 Lot - High ($1000+)</option>
-                        <option value='0.20'>0.20 Lot - Aggressive ($2000+)</option>
-                    </select>
-                    <button>Connect & Start Demo Test</button>
-                </form>
-            </div>
-            """
-    else:
-        xm_box = f"<div class='box' style='border:2px solid #ffaa00;background:#1a1500'><h3 style='color:#ffaa00'>🔒 DEMO MODE - SIMULATED</h3><p style='font-size:11px'>Demo $100 simulated - can't withdraw. Subscribe later to enable VPS trading.</p><a href='/subscribe'><button style='background:#ffaa00'>Become VIP - Test Broker Connect</button></a></div>"
-
-    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:500px;margin:15px auto'><h1 style='text-align:center'>{'VIP SIM BOT' if is_vip and mt5_connected else 'DEMO SIM BOT'}</h1><p style='text-align:center;color:#888'>${gold} | {now} | SIMULATED</p>{xm_box}<div class='box'><h2 style='color:#00ff88;font-size:32px;margin:0'>${demo_bal}</h2><p>{trend} | {direction_txt} | {status} (SIMULATED)</p><p style='font-size:9px;color:#555'>EMA50/200 + RSI14 - Transparent logic - Demo only</p></div><div class='box'><h3 style='color:gold'>Trade Log (Simulated Demo)</h3>{trades_html}<p style='font-size:10px;color:#666;margin-top:12px;border-top:1px solid #222;padding-top:8px'>💡 BOT UPDATES EVERY 30 SECONDS - KEEP TAB OPEN TO WATCH LIVE SIMULATION</p></div><div class='box'><a href='/logout'>Logout</a> | <a href='/'>Home</a></div></div></body></html>"
-
-@app.route('/broker-connect', methods=['POST'])
-def broker_connect():
-    if 'user' not in session: return redirect('/login')
-    u = session['user']
-    broker = request.form['broker']; login = request.form['mt5_login']; pwd = request.form['mt5_password']; server = request.form['mt5_server']; risk = request.form['risk']
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("UPDATE users SET broker=?, mt5_login=?, mt5_password=?, mt5_server=?, mt5_connected=1, risk=? WHERE username=?", (broker, login, pwd, server, risk, u))
-    conn.commit(); conn.close()
-    return redirect('/dashboard')
-
-@app.route('/broker-disconnect')
-def broker_disconnect():
-    if 'user' not in session: return redirect('/login')
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("UPDATE users SET mt5_connected=0, mt5_login='', mt5_password='', mt5_server='', broker='' WHERE username=?", (session['user'],))
-    conn.commit(); conn.close()
-    return redirect('/dashboard')
-
-@app.route('/update-risk', methods=['POST'])
-def update_risk():
-    if 'user' not in session: return redirect('/login')
-    risk = request.form['risk']
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("UPDATE users SET risk=? WHERE username=?", (risk, session['user']))
-    conn.commit(); conn.close()
-    return redirect('/dashboard')
-
-@app.route('/subscribe')
-def subscribe():
-    if 'user' not in session: return redirect('/login')
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("UPDATE users SET subscribed=1 WHERE username=?", (session['user'],))
-    conn.commit(); conn.close()
-    return redirect('/dashboard')
-
-@app.route('/admin', methods=['GET','POST'])
-def admin():
-    if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD: session['admin']=True
-        else: return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong</h2></div></body></html>"
-    if not session.get('admin'): return f"<html><head>{CSS}</head><body><div class='box'><h2>Admin</h2><form method='post'><input name='password' type='password' required><button>Login</button></form></div></body></html>"
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("SELECT id, username, email, balance, subscribed, broker, mt5_login, mt5_server, mt5_connected, risk FROM users ORDER BY id DESC")
-    users = c.fetchall(); conn.close()
-    rows = "".join([f"<tr><td>{u[0]}</td><td>{u[1]}</td><td>{u[2]}</td><td>${u[3]}</td><td>{'VIP' if u[4] else 'FREE'}</td><td>{u[5]}<br>{u[6]}<br>{u[7]}<br>{'✅' if u[8] else '❌'} {u[9]}</td><td><a href='/admin-activate/{u[0]}'>Activate</a></td></tr>" for u in users])
-    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:900px;margin:20px auto;padding:15px'><h1>ADMIN - ALL BROKERS</h1><div class='box' style='max-width:900px'><table style='width:100%;font-size:10px'><tr><th>ID</th><th>User</th><th>Email</th><th>Bal</th><th>Sub</th><th>Broker</th><th>Act</th></tr>{rows}</table></div></body></html>"
-
-@app.route('/admin-activate/<int:user_id>')
-def admin_activate(user_id):
-    if not session.get('admin'): return redirect('/admin')
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("UPDATE users SET subscribed=1 WHERE id=?", (user_id,)); conn.commit(); conn.close()
-    return redirect('/admin')
-
-@app.route('/api/signal')
-def api_signal():
-    if request.args.get('key')!= 'gazelle_secret_2026': return {"error":"no"}
-    trend, direction = calc_signal_logic()
-    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("SELECT mt5_login, mt5_password, mt5_server, broker, risk, username FROM users WHERE subscribed=1 AND mt5_connected=1")
-    accounts = c.fetchall(); conn.close()
-    acc_list = [{"login": a[0], "password": a[1], "server": a[2], "broker": a[3], "risk": a[4], "user": a[5]} for a in accounts]
-    return {"trend": trend, "direction": direction, "price": get_real_gold_price(), "accounts": acc_list, "time": datetime.datetime.now().isoformat()}
-
-@app.route('/logout')
-def logout():
-    session.clear(); return redirect('/')
+    session['vip'] = True
+    return redirect("/?vip=1")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)  
+    app.run(host="0.0.0.0", port=10000)
