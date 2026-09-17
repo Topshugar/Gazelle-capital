@@ -1,46 +1,38 @@
-# GAZELLE CAPITAL - SIMULATION DASHBOARD
-### Algorithmic Gold Trading Demo | Lagos, Nigeria
+# Gazelle Capital 🦌 - XAUUSD Simulated Bot
 
-**Status:** Private Beta - Simulation Phase
-> Access: Invite Only
+Live: `gazelle-capital.onrender.com` (Render)
 
-This is a SIMULATION platform. No real money is collected here.
+Flask app for XAUUSD (Gold) live price + EMA 50/200 + RSI 14 simulation. Demo $100 account. Users can store any MT5 broker credentials for future VPS execution.
 
-We are testing our proprietary Gold (XAUUSD) algorithmic system that trades with 2% risk per trade. This dashboard shows how your investment WOULD grow if it was real.
+> ⚠️ **DISCLAIMER: SIMULATED / DEMO ONLY** - Currently all trades are simulated in Python (random outcome for forward testing). No real MT5 orders yet. Not financial advice. Experimental project from Abuja.
 
-### How The Simulation Works
-- Create a free demo account
-- You get $100 DEMO balance instantly
-- Our bot trades XAUUSD live (simulated for now: +2%/-0.8%)
-- Watch your dashboard balance go up/down live
-- See your simulated profit and 30% performance split
+### Strategy (Transparent)
+- `get_real_gold_price()` = fetches XAU from gold-api.com
+- `calc_signal_logic()`:
+    - EMA50 vs EMA200
+    - RSI 14 filter
+    - BUY if EMA50>EMA200 and RSI 40-68
+    - SELL if EMA50<EMA200 and RSI 32-60
+    - else WAITING
 
-### Platform Features
-- Secure User Authentication (Register / Login)
-- Live Simulated Balance Tracking
-- Real-time Bot Trade Feed
-- Profit Calculation Engine
-- Coming Soon: Real Signal Subscription
+### Stack
+- Flask, SQLite (`gazelle.db`), Requests
+- Monetag (ID: 727e5ecd172c1a11978ca9da5f525f7e) + `quge5.com` tag
+- Render hosting, `sw.js`
 
-### Why Simulation First?
-1. Prove bot profitability for 60 days
-2. Get Myfxbook verified track record
-3. Build trust before handling real capital
-4. Operates 100% in demo - no regulatory license needed
+### Phases
+**Phase 1 NOW - Monetag on Demo (current)**
+Free demo keeps users on page longer = more ad revenue to fund domain+VPS.
 
-### Next Phase: Real Copy Trading
-After simulation phase, investors will keep funds in THEIR OWN MT5 account (Exness/XM/Global). Our master bot trades, their account copies automatically via secure copy system. We only take 30% performance fee. We never hold client money.
+**Phase 2 - Real Trading**
+Buy domain + Contabo VPS ($6/mo) + run `MetaTrader5` Python lib to execute `/api/signal` for VIPs.
 
-### Technology
-- Python Flask Backend
-- Secure Session Management
-- MT5 API Integration (Coming Soon)
-- Mobile Optimized (Works on all devices)
+**Phase 3 - Pricing with Flutterwave**
+- FREE: Demo $100 sim
+- VIP ₦5k/month: 1 MT5, 0.05 lot max
+- PRO ₦12k/month: Unlimited, alerts
 
-### Risk Warning
-This is DEMO only. CFD trading involves high risk. Past simulated performance does not guarantee real profit.
-
-### Contact
-Lagos, Nigeria | Gazelle Capital Team
-
-© 2026 Gazelle Capital - Simulation Phase. All rights reserved. 
+### Run Locally
+```bash
+pip install flask requests
+python App.py
