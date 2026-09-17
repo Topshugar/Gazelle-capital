@@ -1,10 +1,15 @@
-from flask import Flask, request, redirect, session
+from flask import Flask, request, redirect, session, send_from_directory
 import sqlite3, random, datetime, os
 import requests
 
 app = Flask(__name__)
 app.secret_key = "gazelle2026_secure"
 ADMIN_PASSWORD = "gazelleadmin123"
+
+# --- MONETAG ROUTE ---
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('.', 'sw.js')
 
 def get_real_gold_price():
     try:
@@ -56,6 +61,7 @@ def calc_signal_logic():
     else: return "WAITING", None
 
 CSS = """
+<meta name="monetag" content="727e5ecd172c1a11978ca9da5f525f7e">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{background:#000;color:#fff;font-family:Arial;margin:0;padding:0}
@@ -294,4 +300,4 @@ def logout():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port)
