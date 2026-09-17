@@ -60,12 +60,10 @@ def calc_signal_logic():
     else: return "WAITING", None
 
 CSS = """
-<meta name="monetag" content="727e5ecd172c1a11978ca9da5f525f7e">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="https://quge5.com/88/tag.min.js" data-zone="282068" async data-cfasync="false"></script>
 <style>
 body{background:#000;color:#fff;font-family:Arial;margin:0;padding:0}
-.navbar{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;background:#0a0a0a;border-bottom:1px solid #222;position:sticky;top:0;z-index:100}
+.navbar{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;backg:#0a0a0a;border-bottom:1px solid #222;position:sticky;top:0;z-index:100}
 .logo{color:gold;font-weight:bold;font-size:18px}
 .btn-login{border:1px solid gold;color:gold;background:transparent;padding:8px 18px;border-radius:20px;font-weight:bold;font-size:13px;text-decoration:none}
 .btn-signup{background:gold;color:#000;padding:8px 18px;border-radius:20px;font-weight:bold;font-size:13px;text-decoration:none}
