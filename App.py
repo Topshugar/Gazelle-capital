@@ -1,10 +1,8 @@
-from flask import Flask, render_template_string, request, redirect, session
+from flask import Flask, request, redirect, session
 import sqlite3, random, datetime, os
 
 app = Flask(__name__)
 app.secret_key = "gazelle2026_secure"
-
-PAYSTACK_PUBLIC = os.environ.get("PAYSTACK_PUBLIC", "pk_test_xxxx") # You will add real key later
 
 def init_db():
     conn = sqlite3.connect('gazelle.db')
@@ -36,16 +34,7 @@ a{color:gold;text-align:center;display:block;margin-top:15px;text-decoration:non
 
 @app.route('/')
 def home():
-    return f"""
-    <html><head>{CSS}</head><body><div class='box' style='text-align:center'>
-    <h1>GAZELLE CAPITAL</h1>
-    <p style='color:#00ff88'>+127% Gold Bot Profit (Simulation)</p>
-    <p style='color:#888;font-size:12px'>Lagos | Private Beta</p>
-    <div class='price'><h2 style='margin:0'>$29 / month</h2><p style='font-size:12px;color:#888'>Real XAUUSD Signals + Bot Access</p></div>
-    <a href='/register'><button>Create Demo Account - Free $100</button></a>
-    <a href='/login'>Login</a>
-    <p style='color:#555;font-size:11px;margin-top:15px'>Simulation - No real money trading yet</p>
-    </div></body></html>"""
+    return f"<html><head>{CSS}</head><body><div class='box' style='text-align:center'><h1>GAZELLE CAPITAL</h1><p style='color:#00ff88'>+127% Gold Bot Profit (Simulation)</p><p style='color:#888;font-size:12px'>Lagos | Private Beta</p><div class='price'><h2 style='margin:0'>$29 / month</h2><p style='font-size:12px;color:#888'>Real XAUUSD Signals + Bot Access</p></div><a href='/register'><button>Create Demo Account - Free $100</button></a><a href='/login'>Login</a><p style='color:#555;font-size:11px;margin-top:15px'>Simulation - No real money trading yet</p></div></body></html>"
 
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -113,40 +102,23 @@ def reset_password():
 @app.route('/subscribe')
 def subscribe():
     if 'user' not in session: return redirect('/login')
-    email = session.get('email','')
     return f"""
-    <html><head>{CSS}
-    <script src="https://js.paystack.co/v1/inline.js"></script>
-    </head><body><div class='box' style='text-align:center'>
+    <html><head>{CSS}</head><body><div class='box' style='text-align:center'>
     <h2>Subscribe to Real Signals</h2>
     <div class='price'><h1>$29</h1><p>per month</p><p style='font-size:12px'>✓ Live XAUUSD Bot<br>✓ Telegram Signals<br>✓ 30% Profit Share</p></div>
-    <button onclick="payWithPaystack()">Pay with Paystack</button>
-    <p style='font-size:11px;color:#555;margin-top:10px'>For Lagos users - Paystack secure</p>
+    <a href='https://paystack.shop/pay/c75o5awkh0' target='_blank'><button>Pay $29 with Paystack</button></a>
+    <p style='font-size:11px;color:#555;margin-top:10px'>After payment, click below to unlock</p>
+    <a href='/verify/manual'><button style='background:#00ff88'>I Have Paid - Unlock Access</button></a>
     <a href='/dashboard'>Back to Dashboard</a>
-    </div>
-    <script>
-    function payWithPaystack(){{
-      var handler = PaystackPop.setup({{
-        key: '{PAYSTACK_PUBLIC}',
-        email: '{email}',
-        amount: 29000*100,
-        currency: 'USD',
-        callback: function(response){{ window.location.href='/verify/'+response.reference; }},
-        onClose: function(){{ alert('Payment closed'); }}
-      }});
-      handler.openIframe();
-    }}
-    </script>
-    </body></html>"""
+    </div></body></html>"""
 
-@app.route('/verify/<ref>')
-def verify(ref):
+@app.route('/verify/manual')
+def verify_manual():
     if 'user' not in session: return redirect('/login')
-    # In real mode we verify with Paystack API. For demo we just mark as subscribed
     conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
     c.execute("UPDATE users SET subscribed=1 WHERE username=?", (session['user'],))
     conn.commit(); conn.close()
-    return f"<html><head>{CSS}</head><body><div class='box' style='text-align:center'><h2>✅ Subscribed!</h2><p>Reference: {ref}</p><p>Your real signals unlocked</p><a href='/dashboard'><button>Go to Dashboard</button></a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box' style='text-align:center'><h2>✅ Subscribed!</h2><p>Thanks for paying $29</p><p>Real signals unlocked</p><a href='/dashboard'><button>Go to Dashboard</button></a></div></body></html>"
 
 @app.route('/dashboard')
 def dashboard():
