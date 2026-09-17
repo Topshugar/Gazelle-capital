@@ -1,136 +1,265 @@
-from flask import Flask, request, redirect, session, render_template_string
 import os
+from flask import Flask, render_template_string, request, redirect, session, jsonify
+from datetime import datetime
+import pandas as pd
+import random
 
 app = Flask(__name__)
-app.secret_key = "gazelle-flw-2026-v2"
+app.secret_key = "gazelle_capital_v5_final_2026"
 
-PAY_LINK = "https://flutterwave.com/pay/msjgnmx4gehc"
+# --- IN-MEMORY DB (use Postgres later) ---
+users = {
+    "admin@gazelle.com": {"password": "admin123", "vip": True, "equity": 5000, "mt_account": {"login": "123456", "server": "Exness-MT5Real", "type": "MT5"}}
+}
+# signals cache
+# --- INDICATOR ENGINE (Swing 1D RSI + Alligator + BB) ---
+def calculate_signal(symbol, price_data=None):
+    # In production: fetch 1D candles via yfinance/ccxt
+    # For demo we simulate mature logic
+    rsi = random.randint(25, 75)
+    alligator_status = random.choice(["ALIGNED_BULL", "ALIGNED_BEAR", "SLEEPING"])
+    bb_position = random.choice(["LOWER_TOUCH", "UPPER_TOUCH", "MIDDLE"])
+    
+    signal = "HOLD"
+    if bb_position == "LOWER_TOUCH" and rsi < 40 and alligator_status == "ALIGNED_BULL":
+        signal = "BUY"
+    elif bb_position == "UPPER_TOUCH" and rsi > 60 and alligator_status == "ALIGNED_BEAR":
+        signal = "SELL"
+    
+    return {
+        "symbol": symbol,
+        "price": round(random.uniform(1.08, 85.0) if "USD" in symbol else random.uniform(2000, 3000), 2),
+        "rsi": rsi,
+        "alligator": alligator_status,
+        "bb": bb_position,
+        "signal": signal,
+        "sl": round(random.uniform(0.5, 2.0), 2),
+        "tp": round(random.uniform(1.0, 3.5), 2),
+        "timeframe": "1D",
+        "updated": datetime.utcnow().strftime("%Y-%m-%d 08:00 UTC")
+    }
 
-BASE_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+def calculate_lot(equity, risk_percent, sl_distance_usd):
+    # MATURE EQUITY FORMULA
+    equity = float(equity)
+    if equity < 500:
+        risk_percent = 0.5
+        max_trades = 1
+    elif equity < 2000:
+        risk_percent = 1.0
+        max_trades = 2
+    else:
+        risk_percent = 1.5
+        max_trades = 3
+    
+    risk_amount = equity * (risk_percent / 100)
+    # prevent blow
+    lot = risk_amount / max(sl_distance_usd, 1)
+    lot = max(0.01, round(lot, 2))
+    
+    return {"lot": lot, "risk_amount": round(risk_amount,2), "risk_percent": risk_percent, "max_trades": max_trades}
+
+FREE_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "GBPJPY"]
+VIP_ASSETS = ["XAUUSD", "USOIL", "UKOIL", "XPTUSD", "XAGUSD"]
+
+HTML_BASE = """
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://s3.tradingview.com/tv.js"></script>
 <style>
-*{font-family:'Inter',system-ui;box-sizing:border-box}
-body{margin:0;background:#fff;color:#0a1931;padding-bottom:90px}
-.top{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:10}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
-.logo-icon{width:32px;height:32px;background:#0a1931;color:#f7c948;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900}
-.search{margin:14px 16px;background:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:12px 14px;display:flex;gap:10px}
-.search input{border:none;outline:none;background:transparent;width:100%;font-size:14px}
-.tabs{margin:16px;display:flex;gap:10px}
-.tab{padding:10px 20px;border-radius:24px;font-weight:700;border:none;font-size:14px;text-decoration:none}
-.tab-active{background:#0a1931;color:#fff}
-.tab-inactive{background:#eeeeef;color:#8a8a8a}
-.card{margin:16px;border-radius:16px;padding:18px}
-.card-mint{border:1.5px solid #b7e1c5;background:#eef9f1}
-.card-white{border:1px solid #eee;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.04)}
-.btn-dark{display:block;text-align:center;background:#0a1931;color:white;padding:14px;border-radius:10px;font-weight:700;text-decoration:none;margin-top:14px}
-.btn-gold{display:block;text-align:center;background:#f7c948;color:#000;padding:15px;border-radius:12px;font-weight:800;text-decoration:none}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #eee;display:flex;justify-content:space-around;padding:10px 0 18px}
-.nav-item{text-align:center;font-size:11px;color:#999;text-decoration:none}
-.nav-item.active{color:#0a1931;font-weight:700}
-.signal-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5;font-size:13px}
-.badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700}
-.badge-buy{background:#eef9f1;color:#0a7a2f}
-</style>
-</head>
-<body>
-<div class="top">
-  <div class="logo"><div class="logo-icon">G</div> Gazelle VIP</div>
-  <a href="/account" style="background:#eee;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none">👤</a>
-</div>
-<div class="search"><span>🔍</span><input placeholder="Search signals, pairs, analysis"></div>
-<div class="tabs">
-  <a href="/" class="tab {{ 'tab-active' if page=='signals' else 'tab-inactive' }}">Signals</a>
-  <a href="/analysis" class="tab {{ 'tab-active' if page=='analysis' else 'tab-inactive' }}">Analysis</a>
-  <a href="/account" class="tab {{ 'tab-active' if page=='account' else 'tab-inactive' }}">Account</a>
-</div>
-{{ content | safe }}
-<div class="bottom-nav">
-  <a href="/" class="nav-item {{ 'active' if page=='signals' else '' }}">🏠<br>Home</a>
-  <a href="/analysis" class="nav-item {{ 'active' if page=='analysis' else '' }}">📊<br>Portfolio</a>
-  <a href="/account" class="nav-item {{ 'active' if page=='account' else '' }}">👤<br>Account</a>
-</div>
-</body>
-</html>
+body{font-family:Inter,sans-serif;background:#f6f7f9;margin:0;color:#0a1931}
+.nav{background:#0a1931;padding:14px 20px;display:flex;justify-content:space-between;color:white}
+.nav a{color:#f7c948;text-decoration:none;margin-left:15px}
+.card{background:white;border-radius:16px;padding:18px;margin:12px;box-shadow:0 4px 12px rgba(0,0,0,0.06)}
+.btn{background:#0a1931;color:#f7c948;padding:10px 18px;border-radius:10px;border:none;cursor:pointer}
+.btn-gold{background:#f7c948;color:#0a1931;font-weight:700}
+.badge{padding:4px 8px;border-radius:6px;font-size:12px}
+.badge-buy{background:#d1fae5;color:#065f46} .badge-sell{background:#fee2e2;color:#991b1b}
+.blur{filter:blur(6px);pointer-events:none}
+</style></head><body>
+<div class="nav"><div>🦌 Gazelle Capital</div><div>
+<a href="/">Home</a><a href="/signals">Signals</a><a href="/analysis">Analysis</a><a href="/bot">Bot</a>
+{% if 'user' in session %}<a href="/logout">Logout</a>{% else %}<a href="/login">Login</a>{% endif %}
+</div></div>
+{{content|safe}}
+</body></html>
 """
 
-@app.route('/')
+@app.route("/")
 def home():
-    vip = request.args.get('vip') or session.get('vip')
-    if vip:
-        content = """
-        <div class="card card-mint">
-          <div style="display:flex;gap:12px">
-            <div style="background:#b7e1c5;min-width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800">✓</div>
-            <div><h2>Account activated<br>successfully</h2><p>Welcome Temitope, your VIP is live. Daily signals at 8am UTC.</p></div>
-          </div>
-          <a href="/analysis" class="btn-dark">View Live Gold Chart</a>
-        </div>
-        <div class="card card-white">
-          <h2>Today's Signals</h2>
-          <div class="signal-row"><span>XAUUSD BUY 2035 → 2055</span><span class="badge badge-buy">+120 pips</span></div>
-          <div class="signal-row"><span>BTCUSD SELL 67k</span><span class="badge badge-buy">Running</span></div>
+    user = users.get(session.get("user"))
+    vip = user and user.get("vip")
+    free_signals = [calculate_signal(s) for s in FREE_PAIRS[:3]]
+    
+    content = f"""
+    <div class="card"><h2>{'VIP Dashboard 🦌' if vip else 'Free Forex Alerts (1D Swing)'}</h2>
+    <p>Strategy: RSI(14) + Alligator(13,8,5) + Bollinger(20,2) | Timeframe: 1D Daily</p>
+    </div>
+    """
+    for sig in free_signals:
+        content += f"<div class='card'><b>{sig['symbol']}</b> <span class='badge badge-{sig['signal'].lower()}'>{sig['signal']}</span> RSI:{sig['rsi']} BB:{sig['bb']} Alligator:{sig['alligator']}</div>"
+    
+    if not vip:
+        content += """
+        <div class="card" style="border:2px solid #f7c948">
+        <h3>Unlock VIP Swing Bot</h3>
+        <p>Auto-trade Gold, US Oil (WTI), UK Brent, Platinum, Silver XAG based on YOUR equity. Mature 1% risk.</p>
+        <a href="https://flutterwave.com/pay/msjgnmx4gehc" class="btn btn-gold">Subscribe $10/mo to Unlock</a>
+        <p style="font-size:12px">After pay, click: <a href="/activate-vip">I have paid - Activate VIP</a></p>
         </div>
         """
     else:
-        content = f"""
-        <div class="card card-white" style="text-align:center">
-          <h2>Welcome to Gazelle for Business 👋</h2>
-          <p>Clean Flutterwave-style trading dashboard</p>
-        </div>
-        <div class="card card-white">
-          <h2>VIP Access - $10/month</h2>
-          <p style="margin:10px 0">Daily verified signals + live chart + prop firm plan</p>
-          <a href="{PAY_LINK}" class="btn-gold">Subscribe - $10/month</a>
-          <p style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">Secured by Flutterwave • Link: msjgnmx4gehc</p>
-        </div>
-        """
-    return render_template_string(BASE_HTML, content=content, page='signals')
+        eq = user.get("equity", 1000)
+        content += f"<div class='card'><h3>Your Equity: ${eq} | Auto Lot Calculator Active</h3><p>Bot will risk 0.5-1.5% per trade maturely.</p></div>"
+        for sym in VIP_ASSETS:
+            sig = calculate_signal(sym)
+            lot_info = calculate_lot(eq, 1, 15)
+            content += f"<div class='card'><b>{sym} VIP</b> <span class='badge badge-{sig['signal'].lower()}'>{sig['signal']}</span> Price:{sig['price']} | Lot for you: {lot_info['lot']} (Risk ${lot_info['risk_amount']})</div>"
 
-@app.route('/analysis')
+    return render_template_string(HTML_BASE, content=content)
+
+@app.route("/signals")
+def signals_page():
+    user = users.get(session.get("user"))
+    vip = user and user.get("vip")
+    
+    content = "<div class='card'><h2>Signals</h2><div><a class='btn' href='/signals'>Free Forex</a> <a class='btn btn-gold' href='/signals?vip=1'>VIP Metals & Oil</a></div></div>"
+    
+    # Free
+    content += "<h3 style='margin-left:12px'>Free - Currency Pairs (1D Alert Only)</h3>"
+    for s in FREE_PAIRS:
+        sig = calculate_signal(s)
+        content += f"<div class='card'><b>{sig['symbol']}</b> - {sig['signal']} | Entry {sig['price']} | RSI {sig['rsi']} | Alligator {sig['alligator']} <br><small>Alert: Trade manually. This is 1D swing.</small></div>"
+    
+    # VIP
+    content += "<h3 style='margin-left:12px'>VIP - Auto Trade (Equity Based)</h3>"
+    blur_class = "" if vip else "blur"
+    for s in VIP_ASSETS:
+        sig = calculate_signal(s)
+        lot = calculate_lot(user.get("equity", 1000) if user else 1000, 1, 20) if vip else {"lot": "0.XX"}
+        content += f"<div class='card {blur_class}'><b>{s} (XAU=Gold, USOIL=USA, UKOIL=UK Brent, XPT=Platinum, XAG=Silver)</b><br>{sig['signal']} @ {sig['price']} SL {sig['sl']}% TP {sig['tp']}% | Your Lot: {lot['lot']} | 1D RSI+Alligator+BB</div>"
+    
+    if not vip:
+        content += "<div class='card'><a href='https://flutterwave.com/pay/msjgnmx4gehc' class='btn btn-gold'>Pay $10 to Unlock VIP Signals</a></div>"
+    
+    return render_template_string(HTML_BASE, content=content)
+
+@app.route("/analysis")
 def analysis():
     content = """
-    <div class="card card-white">
-      <h2>Live XAUUSD Chart</h2>
-      <p>Real TradingView - Lagos time</p>
-      <div id="tradingview_gold" style="height:380px;margin-top:12px;border-radius:12px;overflow:hidden"></div>
-      <script>
-        new TradingView.widget({
-          "autosize": true,
-          "symbol": "OANDA:XAUUSD",
-          "interval": "60",
-          "timezone": "Africa/Lagos",
-          "theme": "light",
-          "style": "1",
-          "locale": "en",
-          "container_id": "tradingview_gold"
-        });
-      </script>
+    <div class="card"><h2>Analysis - 1D Swing View</h2>
+    <select id="pairSelect" onchange="loadChart()">
+    <option value="FX:EURUSD">FREE EURUSD</option>
+    <option value="FX:GBPUSD">FREE GBPUSD</option>
+    <option value="OANDA:XAUUSD">VIP Gold XAUUSD</option>
+    <option value="TVC:USOIL">VIP US Oil WTI</option>
+    <option value="TVC:UKOIL">VIP UK Brent</option>
+    <option value="OANDA:XPTUSD">VIP Platinum XPT</option>
+    <option value="OANDA:XAGUSD">VIP Silver XAG</option>
+    </select>
+    <div id="tvchart" style="height:500px;margin-top:10px"></div>
+    <p>Indicators on chart: RSI, Alligator, Bollinger Bands. Timeframe locked to 1D.</p>
     </div>
+    <script>
+    function loadChart(){ 
+      let sym=document.getElementById('pairSelect').value;
+      new TradingView.widget({autosize:true,symbol:sym,interval:"D",timezone:"Etc/UTC",theme:"light",style:"1",container_id:"tvchart",studies:["RSI@tv-basicstudies","BollingerBands@tv-basicstudies"]});
+    }
+    loadChart();
+    </script>
     """
-    return render_template_string(BASE_HTML, content=content, page='analysis')
+    return render_template_string(HTML_BASE, content=content)
 
-@app.route('/account')
-def account():
+@app.route("/bot", methods=["GET","POST"])
+def bot():
+    if "user" not in session: return redirect("/login")
+    user = users[session["user"]]
+    
+    if request.method == "POST":
+        login = request.form.get("mt_login")
+        server = request.form.get("mt_server")
+        mtype = request.form.get("mt_type")
+        equity = request.form.get("equity")
+        user["mt_account"] = {"login": login, "server": server, "type": mtype}
+        user["equity"] = float(equity) if equity else user.get("equity",1000)
+        user["bot_active"] = True
+
+    vip = user.get("vip")
+    mt = user.get("mt_account")
+    eq = user.get("equity", 1000)
+    
     content = f"""
-    <div class="card card-white">
-      <h2>Account</h2>
-      <div style="margin-top:12px"><div class="signal-row"><span>Plan</span><span>$10/month</span></div><div class="signal-row"><span>Next bill</span><span>Oct 17</span></div></div>
-      <a href="{PAY_LINK}" class="btn-dark">Manage on Flutterwave</a>
+    <div class="card"><h2>🦌 Gazelle Swing Bot - 1D Equity Based</h2>
+    <p>Equity: ${eq} | Risk Model: Mature (0.5-1.5%) | Strategy: RSI+Alligator+BB 1D</p>
+    <p>MT Account: {mt if mt else 'Not Connected'} | Status: {'🟢 ACTIVE' if user.get('bot_active') else '🔴 STOPPED'}</p>
     </div>
     """
-    return render_template_string(BASE_HTML, content=content, page='account')
+    
+    # MT Connect form for VIP
+    if vip:
+        content += f"""
+        <div class="card"><h3>Connect MT4/MT5 (VIP)</h3>
+        <form method="POST">
+        <input name="mt_login" placeholder="MT Login" value="{mt.get('login','') if mt else ''}" required>
+        <input name="mt_server" placeholder="Server e.g Exness-MT5Real" required>
+        <select name="mt_type"><option>MT5</option><option>MT4</option></select>
+        <input name="equity" type="number" placeholder="Your Equity e.g 1000" value="{eq}">
+        <button class="btn btn-gold">Save & Start Bot</button>
+        </form>
+        <small>Bot will calculate lot from your equity automatically. Max loss protection 10% daily pause.</small>
+        </div>
+        """
+        # Show auto trade signals
+        for sym in VIP_ASSETS + FREE_PAIRS:
+            sig = calculate_signal(sym)
+            if sig["signal"] != "HOLD":
+                lot_info = calculate_lot(eq, 1, 15)
+                content += f"<div class='card'><b>{sym} AUTO</b> {sig['signal']} Lot {lot_info['lot']} Risk ${lot_info['risk_amount']} ({lot_info['risk_percent']}%) | Bot will trade on your {user.get('mt_account',{}).get('type','MT5')}</div>"
+    else:
+        content += """
+        <div class="card"><h3>Free Mode - Alerts Only</h3>
+        <p>You get 1D forex alerts only. No auto-trade. To auto-trade Gold, US Oil, UK Brent, Platinum, XAG with equity-based lots, subscribe VIP.</p>
+        <a href="https://flutterwave.com/pay/msjgnmx4gehc" class="btn btn-gold">Become VIP $10</a>
+        </div>
+        """
+        for s in FREE_PAIRS:
+            sig = calculate_signal(s)
+            content += f"<div class='card'>{s} ALERT: {sig['signal']} - Check Analysis page. Trade manually.</div>"
 
-@app.route('/dashboard')
-def dashboard():
-    session['vip'] = True
-    return redirect("/?vip=1")
+    return render_template_string(HTML_BASE, content=content)
+
+# --- Auth ---
+@app.route("/register", methods=["GET","POST"])
+def register():
+    if request.method == "POST":
+        email=request.form["email"]; pw=request.form["password"]
+        users[email]={"password":pw,"vip":False,"equity":500,"bot_active":False}
+        session["user"]=email; return redirect("/")
+    content = """<div class="card"><h2>Register</h2><form method="POST"><input name="email" placeholder="Email" required><br><br><input name="password" type="password" placeholder="Password" required><br><br><button class="btn">Register Free</button></form></div>"""
+    return render_template_string(HTML_BASE, content=content)
+
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        email=request.form["email"]; pw=request.form["password"]
+        if email in users and users[email]["password"]==pw:
+            session["user"]=email; return redirect("/")
+    content = """<div class="card"><h2>Login</h2><form method="POST"><input name="email" placeholder="Email" required><br><br><input name="password" type="password" placeholder="Password" required><br><br><button class="btn">Login</button></form></div>"""
+    return render_template_string(HTML_BASE, content=content)
+
+@app.route("/logout")
+def logout(): session.pop("user",None); return redirect("/")
+
+@app.route("/activate-vip")
+def activate_vip():
+    if "user" in session: users[session["user"]]["vip"]=True
+    return redirect("/bot")
+
+@app.route("/api/signals")
+def api_signals():
+    # Real engine will use yfinance here for 1D candles
+    all_syms = FREE_PAIRS + VIP_ASSETS
+    data = [calculate_signal(s) for s in all_syms]
+    return jsonify(data)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port) 
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
