@@ -1,4 +1,5 @@
 from flask import Flask, request, redirect, session, render_template_string
+import os
 
 app = Flask(__name__)
 app.secret_key = "gazelle-flw-2026-v2"
@@ -11,24 +12,22 @@ BASE_HTML = """
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://s3.tradingview.com/tv.js"></script>
 <style>
 *{font-family:'Inter',system-ui;box-sizing:border-box}
 body{margin:0;background:#fff;color:#0a1931;padding-bottom:90px}
 .top{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:10}
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
 .logo-icon{width:32px;height:32px;background:#0a1931;color:#f7c948;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900}
-.search{margin:14px 16px;background:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center}
+.search{margin:14px 16px;background:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:12px 14px;display:flex;gap:10px}
 .search input{border:none;outline:none;background:transparent;width:100%;font-size:14px}
 .tabs{margin:16px;display:flex;gap:10px}
-.tab{padding:10px 20px;border-radius:24px;font-weight:700;border:none;font-size:14px;cursor:pointer;text-decoration:none}
+.tab{padding:10px 20px;border-radius:24px;font-weight:700;border:none;font-size:14px;text-decoration:none}
 .tab-active{background:#0a1931;color:#fff}
 .tab-inactive{background:#eeeeef;color:#8a8a8a}
 .card{margin:16px;border-radius:16px;padding:18px}
 .card-mint{border:1.5px solid #b7e1c5;background:#eef9f1}
 .card-white{border:1px solid #eee;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.04)}
-.card h2{margin:0;font-size:19px;font-weight:800}
-.card p{font-size:13px;color:#555;line-height:18px;margin-top:6px}
 .btn-dark{display:block;text-align:center;background:#0a1931;color:white;padding:14px;border-radius:10px;font-weight:700;text-decoration:none;margin-top:14px}
 .btn-gold{display:block;text-align:center;background:#f7c948;color:#000;padding:15px;border-radius:12px;font-weight:800;text-decoration:none}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #eee;display:flex;justify-content:space-around;padding:10px 0 18px}
@@ -40,26 +39,21 @@ body{margin:0;background:#fff;color:#0a1931;padding-bottom:90px}
 </style>
 </head>
 <body>
-
 <div class="top">
   <div class="logo"><div class="logo-icon">G</div> Gazelle VIP</div>
   <a href="/account" style="background:#eee;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none">👤</a>
 </div>
-
 <div class="search"><span>🔍</span><input placeholder="Search signals, pairs, analysis"></div>
-
 <div class="tabs">
-  <a href="/" class="tab {{'tab-active' if page=='signals' else 'tab-inactive'}}">Signals</a>
-  <a href="/analysis" class="tab {{'tab-active' if page=='analysis' else 'tab-inactive'}}">Analysis</a>
-  <a href="/account" class="tab {{'tab-active' if page=='account' else 'tab-inactive'}}">Account</a>
+  <a href="/" class="tab {{ 'tab-active' if page=='signals' else 'tab-inactive' }}">Signals</a>
+  <a href="/analysis" class="tab {{ 'tab-active' if page=='analysis' else 'tab-inactive' }}">Analysis</a>
+  <a href="/account" class="tab {{ 'tab-active' if page=='account' else 'tab-inactive' }}">Account</a>
 </div>
-
 {{ content | safe }}
-
 <div class="bottom-nav">
-  <a href="/" class="nav-item {{'active' if page=='signals' else ''}}">🏠<br>Home</a>
-  <a href="/analysis" class="nav-item {{'active' if page=='analysis' else ''}}">📊<br>Portfolio</a>
-  <a href="/account" class="nav-item {{'active' if page=='account' else ''}}">👤<br>Account</a>
+  <a href="/" class="nav-item {{ 'active' if page=='signals' else '' }}">🏠<br>Home</a>
+  <a href="/analysis" class="nav-item {{ 'active' if page=='analysis' else '' }}">📊<br>Portfolio</a>
+  <a href="/account" class="nav-item {{ 'active' if page=='account' else '' }}">👤<br>Account</a>
 </div>
 </body>
 </html>
@@ -86,15 +80,14 @@ def home():
     else:
         content = f"""
         <div class="card card-white" style="text-align:center">
-          <h2>Welcome to Flutterwave for Business, temitope 👋</h2>
-          <p>We rebuilt Gazelle with same clean style you love</p>
-          <div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><span class="tab tab-active">Banking</span><span class="tab tab-inactive">Payments</span></div>
+          <h2>Welcome to Gazelle for Business 👋</h2>
+          <p>Clean Flutterwave-style trading dashboard</p>
         </div>
         <div class="card card-white">
           <h2>VIP Access - $10/month</h2>
           <p style="margin:10px 0">Daily verified signals + live chart + prop firm plan</p>
           <a href="{PAY_LINK}" class="btn-gold">Subscribe - $10/month</a>
-          <p style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">Powered by Flutterwave - Your link msjgnmx4gehc</p>
+          <p style="font-size:10px;color:#aaa;text-align:center;margin-top:8px">Secured by Flutterwave • Link: msjgnmx4gehc</p>
         </div>
         """
     return render_template_string(BASE_HTML, content=content, page='signals')
@@ -104,7 +97,7 @@ def analysis():
     content = """
     <div class="card card-white">
       <h2>Live XAUUSD Chart</h2>
-      <p>Real TradingView - London session analysis</p>
+      <p>Real TradingView - Lagos time</p>
       <div id="tradingview_gold" style="height:380px;margin-top:12px;border-radius:12px;overflow:hidden"></div>
       <script>
         new TradingView.widget({
@@ -118,10 +111,6 @@ def analysis():
           "container_id": "tradingview_gold"
         });
       </script>
-    </div>
-    <div class="card card-mint">
-      <h2>Today's Bias</h2>
-      <p>Gold bullish above 2035. Buy dips. SL 2025. TP 2055 / 2070. BTC consolidating - wait for breakout.</p>
     </div>
     """
     return render_template_string(BASE_HTML, content=content, page='analysis')
@@ -143,4 +132,5 @@ def dashboard():
     return redirect("/?vip=1")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port) 
