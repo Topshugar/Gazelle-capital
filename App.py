@@ -1,7 +1,10 @@
 import os
 from flask import Flask, render_template_string, request, redirect, session, jsonify
 from datetime import datetime
-import pandas as pd
+import os
+from flask import ...
+from datetime import datetime
+import random
 import random
 
 app = Flask(__name__)
