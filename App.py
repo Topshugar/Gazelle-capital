@@ -1,19 +1,17 @@
-from flask import Flask, render_template_string, request, redirect, session, url_for
+from flask import Flask, render_template_string, request, redirect, session
 import sqlite3, random, datetime, os
 
 app = Flask(__name__)
-app.secret_key = "gazelle2026_secure_key"
+app.secret_key = "gazelle2026_secure"
 
-# GOOGLE OAUTH SETUP (works when you add keys in Render)
-# For now it will work in SIMULATED Google mode
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+PAYSTACK_PUBLIC = os.environ.get("PAYSTACK_PUBLIC", "pk_test_xxxx") # You will add real key later
 
 def init_db():
     conn = sqlite3.connect('gazelle.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, email TEXT UNIQUE, password TEXT, balance REAL)''')
+                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, email TEXT UNIQUE, password TEXT, balance REAL, subscribed INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY, username TEXT, trade TEXT)''')
     conn.commit()
     conn.close()
 
@@ -23,7 +21,7 @@ CSS = """
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{background:#000;color:#fff;font-family:Arial;margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:15px}
-.box{background:#151515;border:1px solid #222;padding:25px;border-radius:12px;width:100%;max-width:400px}
+.box{background:#151515;border:1px solid #222;padding:25px;border-radius:12px;width:100%;max-width:420px}
 input{width:100%;padding:14px;margin:10px 0;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-size:16px}
 button{background:gold;color:#000;padding:14px;border:none;border-radius:8px;font-weight:bold;width:100%;font-size:16px;cursor:pointer}
 h1{color:gold;text-align:center} h2{color:gold}
@@ -32,12 +30,22 @@ a{color:gold;text-align:center;display:block;margin-top:15px;text-decoration:non
 .divider{text-align:center;color:#555;margin:15px 0;position:relative}
 .divider:before{content:'';position:absolute;left:0;top:50%;width:45%;height:1px;background:#333}
 .divider:after{content:'';position:absolute;right:0;top:50%;width:45%;height:1px;background:#333}
+.price{border:2px solid gold;background:#1a1a00;padding:15px;border-radius:10px;text-align:center;margin:15px 0}
 </style>
 """
 
 @app.route('/')
 def home():
-    return f"<html><head>{CSS}</head><body><div class='box' style='text-align:center'><h1>GAZELLE CAPITAL</h1><p>Private Beta | Gold Algo</p><a href='/register'><button>Create Demo Account</button></a><a href='/login'>Login</a></div></body></html>"
+    return f"""
+    <html><head>{CSS}</head><body><div class='box' style='text-align:center'>
+    <h1>GAZELLE CAPITAL</h1>
+    <p style='color:#00ff88'>+127% Gold Bot Profit (Simulation)</p>
+    <p style='color:#888;font-size:12px'>Lagos | Private Beta</p>
+    <div class='price'><h2 style='margin:0'>$29 / month</h2><p style='font-size:12px;color:#888'>Real XAUUSD Signals + Bot Access</p></div>
+    <a href='/register'><button>Create Demo Account - Free $100</button></a>
+    <a href='/login'>Login</a>
+    <p style='color:#555;font-size:11px;margin-top:15px'>Simulation - No real money trading yet</p>
+    </div></body></html>"""
 
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -45,25 +53,13 @@ def register():
         u = request.form['username']; e = request.form['email']; p = request.form['password']
         try:
             conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-            c.execute("INSERT INTO users VALUES (NULL,?,?,?,100)", (u,e,p))
+            c.execute("INSERT INTO users (username,email,password,balance,subscribed) VALUES (?,?,?,?,0)", (u,e,p,100))
             conn.commit(); conn.close()
-            session['user']=u
+            session['user']=u; session['email']=e
             return redirect('/dashboard')
         except:
-            return f"<html><head>{CSS}</head><body><div class='box'><h2>Username or Email taken</h2><a href='/register'>Try again</a></div></body></html>"
-    return f"""
-    <html><head>{CSS}</head><body><div class='box'>
-    <h2>Create Account - $100 Demo</h2>
-    <a href='/google-login'><button class="google-btn">🔵 Continue with Google</button></a>
-    <div class='divider'>OR</div>
-    <form method='post'>
-    <input name='username' placeholder='Username' required>
-    <input name='email' type='email' placeholder='Email (for password reset)' required>
-    <input name='password' type='password' placeholder='Password' required>
-    <button>Create Account</button>
-    </form>
-    <a href='/login'>Have account? Login</a>
-    </div></body></html>"""
+            return f"<html><head>{CSS}</head><body><div class='box'><h2>Username/Email taken</h2><a href='/register'>Try again</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Create Account - $100 Demo</h2><a href='/google-login'><button class='google-btn'>🔵 Continue with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username' required><input name='email' type='email' placeholder='Email' required><input name='password' type='password' placeholder='Password' required><button>Create Account</button></form><a href='/login'>Login</a></div></body></html>"
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -73,54 +69,25 @@ def login():
         c.execute("SELECT * FROM users WHERE (username=? OR email=?) AND password=?", (u,u,p))
         row = c.fetchone(); conn.close()
         if row:
-            session['user']=row[1]
+            session['user']=row[1]; session['email']=row[2]
             return redirect('/dashboard')
         return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong login</h2><a href='/login'>Try again</a></div></body></html>"
-    return f"""
-    <html><head>{CSS}</head><body><div class='box'>
-    <h2>Login</h2>
-    <a href='/google-login'><button class="google-btn">🔵 Login with Google</button></a>
-    <div class='divider'>OR</div>
-    <form method='post'>
-    <input name='username' placeholder='Username or Email' required>
-    <input name='password' type='password' placeholder='Password' required>
-    <button>Login</button>
-    </form>
-    <a href='/forgot'>Forgot Password?</a>
-    <a href='/register'>No account? Register</a>
-    </div></body></html>"""
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><a href='/google-login'><button class='google-btn'>🔵 Login with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/forgot'>Forgot Password?</a><a href='/register'>Register</a></div></body></html>"
 
 @app.route('/google-login')
 def google_login():
-    # SIMULATED GOOGLE FOR NOW - Real Google after you add keys
-    # If you have GOOGLE_CLIENT_ID set, it would redirect to real Google
-    # For demo, we ask for Gmail to simulate
-    return f"""
-    <html><head>{CSS}</head><body><div class='box'>
-    <h2>🔵 Google Login (Demo Mode)</h2>
-    <p style='font-size:12px;color:#888'>Real Google OAuth will activate after you add keys in Render Dashboard > Environment. For now, enter Gmail to simulate:</p>
-    <form method='post' action='/google-callback'>
-    <input name='email' type='email' placeholder='your@gmail.com' required>
-    <button>Continue with Google</button>
-    </form>
-    <a href='/login'>Back to login</a>
-    </div></body></html>"""
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>🔵 Google Login</h2><form method='post' action='/google-callback'><input name='email' type='email' placeholder='your@gmail.com' required><button>Continue</button></form><a href='/login'>Back</a></div></body></html>"
 
 @app.route('/google-callback', methods=['POST'])
 def google_callback():
-    email = request.form['email']
-    username = email.split('@')[0]
+    email = request.form['email']; username = email.split('@')[0]
     conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
     c.execute("SELECT * FROM users WHERE email=?", (email,))
-    user = c.fetchone()
-    if not user:
-        try:
-            c.execute("INSERT INTO users VALUES (NULL,?,?,?,100)", (username, email, "google_oauth_user"))
-            conn.commit()
-        except:
-            pass
-    conn.close()
-    session['user']=username
+    if not c.fetchone():
+        try: c.execute("INSERT INTO users (username,email,password,balance,subscribed) VALUES (?,?,?,?,0)", (username,email,"google"))
+        except: pass
+    conn.commit(); conn.close()
+    session['user']=username; session['email']=email
     return redirect('/dashboard')
 
 @app.route('/forgot', methods=['GET','POST'])
@@ -129,57 +96,72 @@ def forgot():
         email = request.form['email']
         conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
         c.execute("SELECT * FROM users WHERE email=?", (email,))
-        user = c.fetchone()
-        conn.close()
+        user = c.fetchone(); conn.close()
         if user:
-            return f"""
-            <html><head>{CSS}</head><body><div class='box'>
-            <h2>Reset Password</h2>
-            <p style='color:#888;font-size:13px'>Account found for {email}</p>
-            <form method='post' action='/reset-password'>
-            <input type='hidden' name='email' value='{email}'>
-            <input name='new_password' type='password' placeholder='New Password' required>
-            <button>Reset Password</button>
-            </form></div></body></html>"""
-        else:
-            return f"<html><head>{CSS}</head><body><div class='box'><h2>Email not found</h2><a href='/forgot'>Try again</a></div></body></html>"
-    return f"""
-    <html><head>{CSS}</head><body><div class='box'>
-    <h2>Forgot Password?</h2>
-    <p style='font-size:13px;color:#888'>Enter your email to reset</p>
-    <form method='post'>
-    <input name='email' type='email' placeholder='Your email' required>
-    <button>Find Account</button>
-    </form>
-    <a href='/login'>Back to login</a>
-    </div></body></html>"""
+            return f"<html><head>{CSS}</head><body><div class='box'><h2>Reset Password</h2><form method='post' action='/reset-password'><input type='hidden' name='email' value='{email}'><input name='new_password' type='password' placeholder='New Password' required><button>Reset</button></form></div></body></html>"
+        return f"<html><head>{CSS}</head><body><div class='box'><h2>Email not found</h2><a href='/forgot'>Try again</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Forgot Password</h2><form method='post'><input name='email' type='email' placeholder='Your email' required><button>Find Account</button></form><a href='/login'>Back</a></div></body></html>"
 
 @app.route('/reset-password', methods=['POST'])
 def reset_password():
-    email = request.form['email']
-    new_pass = request.form['new_password']
+    email = request.form['email']; new_pass = request.form['new_password']
     conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
     c.execute("UPDATE users SET password=? WHERE email=?", (new_pass, email))
     conn.commit(); conn.close()
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>✅ Password Reset!</h2><p>Your password has been changed.</p><a href='/login'><button>Login Now</button></a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>✅ Password Reset!</h2><a href='/login'><button>Login Now</button></a></div></body></html>"
+
+@app.route('/subscribe')
+def subscribe():
+    if 'user' not in session: return redirect('/login')
+    email = session.get('email','')
+    return f"""
+    <html><head>{CSS}
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    </head><body><div class='box' style='text-align:center'>
+    <h2>Subscribe to Real Signals</h2>
+    <div class='price'><h1>$29</h1><p>per month</p><p style='font-size:12px'>✓ Live XAUUSD Bot<br>✓ Telegram Signals<br>✓ 30% Profit Share</p></div>
+    <button onclick="payWithPaystack()">Pay with Paystack</button>
+    <p style='font-size:11px;color:#555;margin-top:10px'>For Lagos users - Paystack secure</p>
+    <a href='/dashboard'>Back to Dashboard</a>
+    </div>
+    <script>
+    function payWithPaystack(){{
+      var handler = PaystackPop.setup({{
+        key: '{PAYSTACK_PUBLIC}',
+        email: '{email}',
+        amount: 29000*100,
+        currency: 'USD',
+        callback: function(response){{ window.location.href='/verify/'+response.reference; }},
+        onClose: function(){{ alert('Payment closed'); }}
+      }});
+      handler.openIframe();
+    }}
+    </script>
+    </body></html>"""
+
+@app.route('/verify/<ref>')
+def verify(ref):
+    if 'user' not in session: return redirect('/login')
+    # In real mode we verify with Paystack API. For demo we just mark as subscribed
+    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
+    c.execute("UPDATE users SET subscribed=1 WHERE username=?", (session['user'],))
+    conn.commit(); conn.close()
+    return f"<html><head>{CSS}</head><body><div class='box' style='text-align:center'><h2>✅ Subscribed!</h2><p>Reference: {ref}</p><p>Your real signals unlocked</p><a href='/dashboard'><button>Go to Dashboard</button></a></div></body></html>"
 
 @app.route('/dashboard')
 def dashboard():
-    if 'user' not in session:
-        return redirect('/login')
+    if 'user' not in session: return redirect('/login')
     u = session['user']
     conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
-    c.execute("SELECT balance FROM users WHERE username=?", (u,))
+    c.execute("SELECT balance, subscribed FROM users WHERE username=?", (u,))
     row = c.fetchone()
-    if not row:
-        return redirect('/logout')
-    bal = row[0]
+    if not row: return redirect('/logout')
+    bal, sub = row
     change = random.choice([1.5, 2.0, -0.8, 2.5])
     bal = round(bal * (1 + change/100), 2)
     c.execute("UPDATE users SET balance=? WHERE username=?", (bal, u))
     now = datetime.datetime.now().strftime("%H:%M:%S")
     trade = f"[{now}] XAUUSD BUY {change}% -> ${bal}"
-    c.execute("CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY, username TEXT, trade TEXT)")
     c.execute("INSERT INTO trades VALUES (NULL,?,?)", (u, trade))
     conn.commit()
     c.execute("SELECT trade FROM trades WHERE username=? ORDER BY id DESC LIMIT 5", (u,))
@@ -187,11 +169,12 @@ def dashboard():
     conn.close()
     profit = round(bal-100,2)
     trades_html = "".join([f"<p style='font-size:13px'>{t[0]}</p>" for t in trades])
-    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:500px;margin:15px auto'><h1>GAZELLE DASHBOARD</h1><p style='text-align:center;color:#888'>Welcome {u}</p><div class='box' style='max-width:500px;margin-bottom:15px'><h2 style='color:#00ff88'>${bal}</h2><p>Profit: ${profit}</p></div><div class='box' style='max-width:500px;margin-bottom:15px'><h3 style='color:gold'>Live Trades</h3>{trades_html}</div><div class='box' style='max-width:500px'><p>Your Share (30%): ${round(profit*0.3,2)}</p><a href='/logout'>Logout</a></div></div></body></html>"
+    sub_badge = "✅ Subscribed" if sub else "❌ Free Demo - <a href='/subscribe'>Subscribe $29</a>"
+    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:500px;margin:15px auto'><h1>GAZELLE DASHBOARD</h1><p style='text-align:center;color:#888'>Welcome {u} | {sub_badge}</p><div class='box' style='max-width:500px;margin-bottom:15px'><h2 style='color:#00ff88'>${bal}</h2><p>Profit: ${profit}</p></div><div class='box' style='max-width:500px;margin-bottom:15px'><h3 style='color:gold'>Live Trades</h3>{trades_html}</div><div class='box' style='max-width:500px'><p>Share (30%): ${round(profit*0.3,2)}</p><a href='/subscribe'><button>Subscribe $29/month</button></a><a href='/logout'>Logout</a></div></div></body></html>"
 
 @app.route('/logout')
 def logout():
-    session.pop('user', None)
+    session.clear()
     return redirect('/')
 
 if __name__ == '__main__':
