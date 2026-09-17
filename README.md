@@ -1,38 +1,66 @@
-# Gazelle Capital 🦌 - XAUUSD Simulated Bot
+# Gazelle Capital 🦌 — XAUUSD Strategy Lab
 
-Live: `gazelle-capital.onrender.com` (Render)
+> **⚠️ DISCLAIMER: SIMULATED / EDUCATIONAL ONLY**
+> All trades shown are simulated Python calculations for forward-testing. No real MT5 orders are executed in the current version. No profit guarantee. Not financial advice. Trading Gold/Forex is high risk. This is an experimental project from Abuja.
 
-Flask app for XAUUSD (Gold) live price + EMA 50/200 + RSI 14 simulation. Demo $100 account. Users can store any MT5 broker credentials for future VPS execution.
+## Table of Contents
+1. What is this?
+2. Strategy (Transparent)
+3. Features
+4. Tech Stack
+5. How It Works
+6. Run Locally
+7. Environment Variables
+8. Security Notes
+9. Roadmap
+10. Pricing (Future)
+11. Admin
+12. Limitations
+13. License
 
-> ⚠️ **DISCLAIMER: SIMULATED / DEMO ONLY** - Currently all trades are simulated in Python (random outcome for forward testing). No real MT5 orders yet. Not financial advice. Experimental project from Abuja.
+### 1. What is this?
+Gazelle Capital is a Flask web app that shows live XAUUSD price and simulates a bot using EMA + RSI. Users get a free $100 demo account, watch live signals, and can pre-save MT5 broker details for future VPS execution.
 
-### Strategy (Transparent)
-- `get_real_gold_price()` = fetches XAU from gold-api.com
-- `calc_signal_logic()`:
-    - EMA50 vs EMA200
-    - RSI 14 filter
-    - BUY if EMA50>EMA200 and RSI 40-68
-    - SELL if EMA50<EMA200 and RSI 32-60
-    - else WAITING
+We are in **Demo Phase** — test logic first before real money.
 
-### Stack
-- Flask, SQLite (`gazelle.db`), Requests
-- Monetag (ID: 727e5ecd172c1a11978ca9da5f525f7e) + `quge5.com` tag
-- Render hosting, `sw.js`
+### 2. Strategy (Transparent)
+Located in `calc_signal_logic()`:
 
-### Phases
-**Phase 1 NOW - Monetag on Demo (current)**
-Free demo keeps users on page longer = more ad revenue to fund domain+VPS.
+- Price source: live XAUUSD REST API with fallback
+- Buffer: last 250 prices
+- EMA50 vs EMA200 for trend
+- RSI 14 for filter
+- BUY if EMA50>EMA200 and RSI 40-68
+- SELL if EMA50<EMA200 and RSI 32-60
+- Else WAITING
 
-**Phase 2 - Real Trading**
-Buy domain + Contabo VPS ($6/mo) + run `MetaTrader5` Python lib to execute `/api/signal` for VIPs.
+No hidden AI. Fully open logic.
 
-**Phase 3 - Pricing with Flutterwave**
-- FREE: Demo $100 sim
-- VIP ₦5k/month: 1 MT5, 0.05 lot max
-- PRO ₦12k/month: Unlimited, alerts
+### 3. Features
+- Live XAUUSD ticker
+- Demo auth (register/login)
+- $100 demo balance simulation
+- Trade log with timestamps
+- Multi-broker MT5 form (XM, HFM, Exness, Deriv, FBS, OctaFX, Other)
+- Risk selector (0.01 to 0.20 lot) for future use
+- VIP flag system
+- Admin dashboard
+- Secure private API for VPS bot
+- Retention UI (keep tab open to watch sim)
+- Ad-ready but compliant (no fake income claims)
 
-### Run Locally
+### 4. Tech Stack
+- Python, Flask, SQLite (dev), Requests
+- Inline CSS black/gold theme
+- Hosting: Render
+- Future: Windows Forex VPS + MetaTrader5 Python + Postgres + Flutterwave
+
+### 5. How It Works
+Browser -> Flask -> get_real_gold_price() -> add_price() buffer -> calc_signal_logic() -> simulate balance change -> save to trades table -> if VIP, credentials saved for future VPS execution via private API.
+
+### 6. Run Locally
 ```bash
-pip install flask requests
+git clone <repo>
+cd <repo>
+pip install -r requirements.txt
 python App.py
