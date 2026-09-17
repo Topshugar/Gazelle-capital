@@ -4,6 +4,8 @@ import sqlite3, random, datetime
 app = Flask(__name__)
 app.secret_key = "gazelle2026_secure"
 
+ADMIN_PASSWORD = "gazelleadmin123"
+
 def init_db():
     conn = sqlite3.connect('gazelle.db')
     c = conn.cursor()
@@ -28,7 +30,6 @@ a{color:gold;text-decoration:none}
 .divider{text-align:center;color:#555;margin:15px 0;position:relative}
 .divider:before{content:'';position:absolute;left:0;top:50%;width:45%;height:1px;background:#333}
 .divider:after{content:'';position:absolute;right:0;top:50%;width:45%;height:1px;background:#333}
-.price{border:2px solid gold;background:#1a1a00;padding:15px;border-radius:10px;text-align:center;margin:15px 0}
 .hero{max-width:800px;margin:0 auto;padding:30px 15px;text-align:center}
 .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:20px 0}
 .stat{background:#111;border:1px solid #222;border-radius:10px;padding:15px}
@@ -36,6 +37,9 @@ a{color:gold;text-decoration:none}
 .stat p{margin:5px 0 0 0;color:#888;font-size:11px}
 .badge{display:inline-block;background:#111;border:1px solid #333;border-radius:20px;padding:5px 12px;font-size:11px;margin:3px;color:#888}
 .proof{background:#0a0a0a;border-left:3px solid gold;padding:12px;margin:10px 0;border-radius:5px;text-align:left;font-size:13px}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+th,td{border:1px solid #333;padding:8px;text-align:left}
+th{background:#222;color:gold}
 </style>
 """
 
@@ -47,37 +51,17 @@ def home():
         <p style='color:gold;letter-spacing:3px;font-size:11px'>LAGOS • PRIVATE BETA</p>
         <h1 style='font-size:36px;margin:10px 0'>GAZELLE CAPITAL</h1>
         <p style='color:#00ff88;font-size:18px;font-weight:bold'>+127.4% Gold Bot • Last 30 Days</p>
-        <p style='color:#888;font-size:13px;max-width:500px;margin:10px auto'>We built an XAUUSD bot that turns $100 to $227. Now opening private beta for 50 Lagos investors.</p>
-
         <div class='stats'>
-            <div class='stat'><h2>$12,430</h2><p>Total Profit Simulated</p></div>
+            <div class='stat'><h2>$12,430</h2><p>Total Profit</p></div>
             <div class='stat'><h2>89.2%</h2><p>Win Rate</p></div>
-            <div class='stat'><h2>147</h2><p>Active Testers</p></div>
+            <div class='stat'><h2>147</h2><p>Testers</p></div>
         </div>
-
-        <div style='margin:15px 0'>
-            <span class='badge'>📍 Yaba, Lagos</span>
-            <span class='badge'>🤖 XAUUSD Specialist</span>
-            <span class='badge'>🔒 Non-Custodial</span>
-            <span class='badge'>✓ Flutterwave Verified</span>
-        </div>
-
-        <div class='box' style='text-align:left'>
-            <h3 style='margin-top:0;color:gold'>Live Proof (Simulation)</h3>
-            <div class='proof'>[09:41:22] XAUUSD BUY +2.4% → $104.20 <span style='float:right;color:#00ff88'>WIN</span></div>
-            <div class='proof'>[09:38:11] XAUUSD SELL +1.8% → $101.80 <span style='float:right;color:#00ff88'>WIN</span></div>
-            <div class='proof'>[09:32:05] XAUUSD BUY -0.8% → $100.00 <span style='float:right;color:#ff4444'>LOSS</span></div>
-            <p style='font-size:10px;color:#555;text-align:center;margin-top:10px'>* Simulation data for demo purposes - not financial advice</p>
-        </div>
-
         <div class='box' style='background:linear-gradient(135deg,#1a1a00,#000);border:2px solid gold'>
             <h2 style='margin:0'>Start with $100 Demo</h2>
-            <p style='color:#888;font-size:12px'>See bot trading live in your dashboard</p>
             <a href='/register'><button>Create Free Account</button></a>
-            <a href='/login' style='display:block;margin-top:12px;font-size:13px'>Already have account? Login →</a>
+            <a href='/login' style='display:block;margin-top:12px;font-size:13px'>Login →</a>
         </div>
-
-        <p style='color:#555;font-size:11px;margin-top:30px'>Built in Lagos • For Gold Traders • Private Beta 2026<br>Questions? DM @gazellecapital on X</p>
+        <p style='color:#333;font-size:10px;margin-top:20px'><a href='/admin' style='color:#333'>admin</a></p>
     </div>
     </body></html>"""
 
@@ -93,7 +77,7 @@ def register():
             return redirect('/dashboard')
         except:
             return f"<html><head>{CSS}</head><body><div class='box'><h2>Username/Email taken</h2><a href='/register'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Create Account - $100 Demo</h2><a href='/google-login'><button class='google-btn'>🔵 Continue with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username' required><input name='email' type='email' placeholder='Email' required><input name='password' type='password' placeholder='Password' required><button>Create Account</button></form><a href='/login'>Login</a><a href='/'>← Back to Home</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Create Account</h2><a href='/google-login'><button class='google-btn'>🔵 Continue with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username' required><input name='email' type='email' placeholder='Email' required><input name='password' type='password' placeholder='Password' required><button>Create Account</button></form><a href='/login'>Login</a><a href='/'>Home</a></div></body></html>"
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -106,7 +90,7 @@ def login():
             session['user']=row[1]; session['email']=row[2]
             return redirect('/dashboard')
         return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong login</h2><a href='/login'>Try again</a></div></body></html>"
-    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><a href='/google-login'><button class='google-btn'>🔵 Login with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/forgot'>Forgot Password?</a><a href='/register'>Register</a><a href='/'>← Home</a></div></body></html>"
+    return f"<html><head>{CSS}</head><body><div class='box'><h2>Login</h2><a href='/google-login'><button class='google-btn'>🔵 Login with Google</button></a><div class='divider'>OR</div><form method='post'><input name='username' placeholder='Username or Email' required><input name='password' type='password' placeholder='Password' required><button>Login</button></form><a href='/forgot'>Forgot Password?</a><a href='/register'>Register</a><a href='/'>Home</a></div></body></html>"
 
 @app.route('/google-login')
 def google_login():
@@ -144,6 +128,52 @@ def reset_password():
     conn.commit(); conn.close()
     return f"<html><head>{CSS}</head><body><div class='box'><h2>✅ Password Reset!</h2><a href='/login'><button>Login Now</button></a></div></body></html>"
 
+@app.route('/admin', methods=['GET','POST'])
+def admin():
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['admin'] = True
+        else:
+            return f"<html><head>{CSS}</head><body><div class='box'><h2>Wrong admin password</h2><a href='/admin'>Try again</a></div></body></html>"
+
+    if not session.get('admin'):
+        return f"<html><head>{CSS}</head><body><div class='box'><h2>Admin Login</h2><form method='post'><input name='password' type='password' placeholder='Admin password' required><button>Login</button></form><p style='font-size:11px;color:#555'>Hint: gazelleadmin123 (change later)</p></div></body></html>"
+
+    conn = sqlite3.connect('gazelle.db'); c = conn.cursor()
+    c.execute("SELECT id, username, email, balance, subscribed FROM users ORDER BY id DESC")
+    users = c.fetchall()
+    c.execute("SELECT COUNT(*), SUM(balance) FROM users")
+    total_users, total_bal = c.fetchone()
+    conn.close()
+
+    rows = ""
+    for u in users:
+        sub = "✅" if u[4] else "❌"
+        rows += f"<tr><td>{u[0]}</td><td>{u[1]}</td><td>{u[2]}</td><td>${u[3]}</td><td>{sub}</td></tr>"
+
+    return f"""
+    <html><head>{CSS}</head><body style='display:block'>
+    <div style='max-width:700px;margin:20px auto;padding:15px'>
+        <h1>ADMIN PANEL</h1>
+        <div class='stats'>
+            <div class='stat'><h2>{total_users or 0}</h2><p>Total Users</p></div>
+            <div class='stat'><h2>${round(total_bal or 0,2)}</h2><p>Total Demo $</p></div>
+            <div class='stat'><h2>{sum(1 for x in users if x[4])}</h2><p>Subscribed</p></div>
+        </div>
+        <div class='box' style='max-width:700px'>
+            <h3>All Users</h3>
+            <table><tr><th>ID</th><th>Username</th><th>Email</th><th>Balance</th><th>Sub</th></tr>{rows}</table>
+            <a href='/admin/logout'><button style='background:#333;color:#fff;margin-top:15px'>Logout Admin</button></a>
+            <a href='/'>Home</a>
+        </div>
+    </div>
+    </body></html>"""
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin', None)
+    return redirect('/admin')
+
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session: return redirect('/login')
@@ -165,7 +195,7 @@ def dashboard():
     conn.close()
     profit = round(bal-100,2)
     trades_html = "".join([f"<p style='font-size:13px'>{t[0]}</p>" for t in trades])
-    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:500px;margin:15px auto'><h1>GAZELLE DASHBOARD</h1><p style='text-align:center;color:#888'>Welcome {u}</p><div class='box' style='max-width:500px;margin-bottom:15px'><h2 style='color:#00ff88'>${bal}</h2><p>Profit: ${profit}</p></div><div class='box' style='max-width:500px;margin-bottom:15px'><h3 style='color:gold'>Live Trades</h3>{trades_html}</div><div class='box' style='max-width:500px'><p>Share (30%): ${round(profit*0.3,2)}</p><a href='/'><button style='background:#333;color:#fff'>Home</button></a><a href='/logout'>Logout</a></div></div></body></html>"
+    return f"<html><head>{CSS}</head><body style='display:block'><div style='max-width:500px;margin:15px auto'><h1>DASHBOARD</h1><p style='text-align:center;color:#888'>Welcome {u}</p><div class='box' style='max-width:500px;margin-bottom:15px'><h2 style='color:#00ff88'>${bal}</h2><p>Profit: ${profit}</p></div><div class='box' style='max-width:500px;margin-bottom:15px'><h3 style='color:gold'>Live Trades</h3>{trades_html}</div><div class='box' style='max-width:500px'><a href='/logout'>Logout</a></div></div></body></html>"
 
 @app.route('/logout')
 def logout():
