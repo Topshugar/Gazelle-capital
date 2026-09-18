@@ -1,18 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Gazelle Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gazelle Pro MT5</title>
 <style>
-body{background:#0a0e14;color:#00ff88;text-align:center;font-family:Arial;padding:40px}
-.card{background:#151a23;padding:20px;border-radius:10px;max-width:400px;margin:20px auto}
+body{background:#0a0e14;color:#fff;font-family:Arial;margin:0;padding:20px;text-align:center}
+h1{color:#00ff88}
+.card{background:#151a23;padding:20px;border-radius:12px;max-width:500px;margin:15px auto;border:1px solid #222}
+.btn{padding:12px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin:5px}
+.free{background:#00ff88;color:#000}
+.vip{background:gold;color:#000}
+.vvip{background:purple;color:#fff}
+.signal{border-left:4px solid #00ff88;text-align:left;padding:10px}
+.locked{opacity:0.4;filter:blur(3px)}
+input{padding:10px;width:80%;margin:5px;border-radius:6px;border:none}
 </style>
 </head>
 <body>
 <h1>GAZELLE PRO MT5</h1>
-<p>Lagos - Live</p>
-<div class="card">
-<h3>Site is LIVE</h3>
-<p>Render deploy successful</p>
+<p>Lagos - 85% Accuracy Signals</p>
+
+<div class="card" id="auth">
+<h3>Login / Register</h3>
+<input id="u" placeholder="Username">
+<input id="p" type="password" placeholder="Password">
+<br>
+<button class="btn free" onclick="reg()">Register</button>
+<button class="btn free" onclick="log()">Login</button>
+<p id="msg"></p>
 </div>
+
+<div class="card">
+<h3>Signals</h3>
+<div id="signals">Loading...</div>
+</div>
+
+<div class="card">
+<h3>Upgrade</h3>
+<p>VIP - ₦15,000/month - Gold, XAU, 92% accuracy</p>
+<button class="btn vip" onclick="pay('VIP')">Pay VIP with Flutterwave</button>
+<p>VVIP - ₦30,000/month - All pairs + EA</p>
+<button class="btn vvip" onclick="pay('VVIP')">Pay VVIP with Flutterwave</button>
+</div>
+
+<script>
+let tier='FREE';
+async function reg(){
+ let r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});
+ let d=await r.json(); msg.innerText=d.ok?'Registered! Now login':d.error;
+}
+async function log(){
+ let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});
+ let d=await r.json(); if(d.ok){tier=d.tier; msg.innerText='Logged in as '+tier; loadSignals()} else msg.innerText=d.error;
+}
+async function loadSignals(){
+ let r=await fetch('/api/signals'); let data=await r.json();
+ let html=''; data.forEach(s=>{
+   let locked = (s.tier=='VIP' && tier=='FREE') || (s.tier=='VVIP' && tier!='VVIP');
+   html+=`<div class="card signal ${locked?'locked':''}"><b>${s.pair} - ${s.action}</b><br>Entry: ${s.entry} | SL: ${s.sl} | TP: ${s.tp}<br>Accuracy: ${s.accuracy} - ${s.tier} ${locked?'🔒':''}</div>`;
+ });
+ signals.innerHTML=html;
+}
+function pay(t){
+ alert('Flutterwave for '+t+' - Add your Flutterwave link here. After payment DM admin on WhatsApp to upgrade.');
+ window.open('https://flutterwave.com/pay/YOUR_LINK_HERE','_blank');
+}
+loadSignals();
+</script>
 </body>
-</html> 
+  </html>
