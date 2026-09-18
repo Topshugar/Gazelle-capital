@@ -63,3 +63,37 @@ def detail(symbol):
     d=engine(symbol.upper())
     body=f"<div class='px-6 max-w-[760px] mx-auto pt-8'><a href='/signals' class='text-[12px] bg-white border px-3 py-1.5 rounded-full'>Back</a><div class='mt-5 bg-white border rounded-[20px] p-6'><h1 class='text-[26px] font-[800]'>{symbol.upper()} {d['signal']}</h1><div class='mt-6 bg-blue-50 border rounded-[14px] p-4'><div class='text-[10px] font-[700] text-blue-700'>WHY THIS TRADE</div><p class='text-[13px] mt-2'>{d['reason']}</p></div><div class='grid grid-cols-3 gap-3 mt-5'><div class='bg-slate-50 border rounded-[14px] p-4'><div class='text-[10px]'>ENTRY</div><div class='font-[800]'>${d['price']}</div></div><div class='bg-red-50 border rounded-[14px] p-4'><div class='text-[10px]'>SL</div><div class='font-[800]'>${d['sl']}</div></div><div class='bg-green-50 border rounded-[14px] p-4'><div class='text-[10px]'>BE</div><div class='font-[800]'>${d['be']}</div></div></div></div></div>"
     return render_template_string(HEAD + body + FOOT)
+@app.route("/register", methods=["GET","POST"])
+def reg():
+    if request.method == "POST":
+        users[request.form.get("email")] = {"name": request.form.get("name")}
+        session["user"] = request.form.get("email")
+        return redirect("/welcome")
+    body = """<div class="min-h-[85vh] grid place-items-center px-6 py-12 bg-[#f8fafc]"><div class="w-full max-w-[380px] bg-white border rounded-[20px] p-7"><h1 class="text-[22px] font-[800]">Create free account</h1><form method="POST" class="mt-6 space-y-3"><input name="name" placeholder="Full Name" class="w-full bg-slate-50 border rounded-full px-4 py-3 text-[13px]" required><input name="email" type="email" placeholder="Email" class="w-full bg-slate-50 border rounded-full px-4 py-3 text-[13px]" required><input name="password" type="password" placeholder="Password" class="w-full bg-slate-50 border rounded-full px-4 py-3 text-[13px]" required><button class="w-full bg-[#0f172a] text-white py-3 rounded-full font-[700]">Create Account</button></form></div></div>"""
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/welcome")
+def welcome():
+    name = users.get(session.get("user"), {}).get("name", "Trader")
+    body = f"<div class='px-6 max-w-[800px] mx-auto pt-16 text-center'><h1 class='text-[32px] font-[800]'>Welcome, {name}</h1><div class='grid md:grid-cols-3 gap-4 mt-10'><a href='/signals' class='bg-white border rounded-[16px] p-5'>Check Signals</a><a href='/news' class='bg-white border rounded-[16px] p-5'>Market News</a><a href='/signals' class='bg-[#0f172a] text-white rounded-[16px] p-5'>Go Pro $10</a></div></div>"
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        session["user"] = request.form.get("email")
+        return redirect("/signals")
+    body = """<div class="min-h-[85vh] grid place-items-center px-6 py-12"><div class="w-full max-w-[380px] bg-white border rounded-[20px] p-7"><h1 class="text-[22px] font-[800]">Welcome back</h1><form method="POST" class="mt-6 space-y-3"><input name="email" type="email" placeholder="Email" class="w-full bg-slate-50 border rounded-full px-4 py-3 text-[13px]" required><input name="password" type="password" placeholder="Password" class="w-full bg-slate-50 border rounded-full px-4 py-3 text-[13px]" required><button class="w-full bg-[#0f172a] text-white py-3 rounded-full font-[700]">Log in</button></form><div class="text-center mt-5 text-[12px]">No account? <a href="/register" class="text-[#2563eb] font-[700]">Create free</a></div></div></div>"""
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect("/")
+
+@app.route("/api/signals")
+def api():
+    return jsonify([engine(s) for s in REAL])
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
