@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAZELLE SIGNALS PRO - MT5 Terminal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://s.tradingview.com/tv.js"></script>
+<style>
+:root{--bg:#0e0e10;--card:#1a1a1d;--border:#2a2a2e;--green:#26a69a;--red:#ef5350;--gold:#f9a825}
+body{background:var(--bg);color:#d4d4d8;font-family: 'Inter', monospace}
+.mt5-row:hover{background:#222226}
+.scroll-thin::-webkit-scrollbar{width:6px;height:6px}
+.scroll-thin::-webkit-scrollbar-thumb{background:#3a3a3e;border-radius:10px}
+.badge-HIGH{background:#ef5350;color:white}.badge-MED{background:#f9a825;color:black}.badge-LOW{background:#616161;color:white}
+</style>
+</head>
+<body class="overflow-hidden">
+<header class="h-14 bg-[#1a1a1d] border-b border-[#2a2a2e] flex items-center justify-between px-4 sticky top-0 z-50">
+<div class="flex items-center gap-3"><i class="fa-solid fa-chart-line text-[#26a69a] text-xl"></i><span class="font-bold text-white">GAZELLE</span><span class="text-xs text-zinc-500">PRO MT5</span><span id="realStats" class="ml-4 text-xs bg-zinc-800 px-2 py-1 rounded">Win: --% | Total: --</span></div>
+<div class="flex items-center gap-2">
+<button id="themeToggle" class="bg-zinc-800 px-3 py-1 rounded text-xs">Light</button>
+<div id="userInfo" class="text-xs"></div>
+<button id="authBtn" class="bg-[#26a69a] px-4 py-1.5 rounded text-white text-xs font-bold">Login</button>
+<button id="logoutBtn" class="hidden bg-red-600 px-4 py-1.5 rounded text-white text-xs font-bold">Logout</button>
+</div>
+</header>
+<div class="flex h-[calc(100vh-3.5rem)]">
+<div class="w-[280px] bg-[#151518] border-r border-[#2a2a2e] flex flex-col">
+<div class="p-2 border-b border-[#2a2a2e] flex gap-1"><input id="searchPair" placeholder="Search EURUSD, XAU..." class="w-full bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1.5 text-xs"><button id="vipBtn" class="bg-[#f9a825] text-black px-3 py-1 rounded text-xs font-bold">VIP $10</button></div>
+<div id="signalList" class="flex-1 overflow-y-auto text-xs"></div>
+<div class="border-t border-[#2a2a2e] p-2">
+<div class="text-[10px] text-zinc-500 mb-1">ECONOMIC CALENDAR LIVE</div>
+<div id="newsList" class="space-y-1 max-h-28 overflow-y-auto"></div>
+</div>
+</div>
+<div class="flex-1 flex flex-col bg-[#0e0e10]">
+<div id="tradingview_chart" class="h-[55%] border-b border-[#2a2a2e]"></div>
+<div id="signalDetails" class="h-[45%] bg-[#151518] p-3 overflow-y-auto">
+<div class="text-zinc-500 text-xs text-center mt-10">Select a signal from Market Watch</div>
+</div>
+</div>
+<div class="w-[340px] bg-[#151518] border-l border-[#2a2a2e] flex flex-col">
+<div class="flex text-[11px] border-b border-[#2a2a2e]"><button class="tabBtn flex-1 py-2 bg-[#1e1e22] text-white" data-tab="community">GAZELLE Community</button><button class="tabBtn flex-1 py-2 text-zinc-500" data-tab="dashboard">Dashboard</button><button class="tabBtn flex-1 py-2 text-zinc-500" data-tab="tools">Tools</button></div>
+<div id="tab-community" class="flex-1 flex flex-col p-2">
+<div id="commentList" class="flex-1 overflow-y-auto space-y-2 text-xs"></div>
+<div class="mt-2 flex gap-1"><input id="commentInput" placeholder="Strictly topic related..." class="flex-1 bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1.5 text-xs"><button id="sendComment" class="bg-[#26a69a] px-3 rounded text-white">Send</button></div>
+<div class="mt-2 text-[10px] text-zinc-500">Leaderboard: <span id="leaderboard"></span></div>
+  </div>
+  <div id="tab-dashboard" class="hidden flex-1 p-3 space-y-3 overflow-y-auto">
+<div class="bg-[#1e1e22] rounded p-3"><div class="text-xs text-zinc-400">My Tier</div><div id="dashTier" class="font-bold text-white">FREE</div><div id="dashExpiry" class="text-[10px] text-zinc-500"></div></div>
+<div class="bg-[#1e1e22] rounded p-3"><div class="text-xs text-zinc-400">Next Signal Countdown</div><div id="countdown" class="text-lg font-mono text-[#26a69a]">00:15:00</div></div>
+<div class="bg-[#1e1e22] rounded p-3"><div class="text-xs text-zinc-400 mb-1">Admin Add Signal (client)</div>
+<input id="adPair" placeholder="EURUSD" class="w-full mb-1 bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs">
+<div class="grid grid-cols-2 gap-1"><select id="adAction" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"><option>BUY</option><option>SELL</option></select><select id="adCat" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"><option>FOREX</option><option>GOLD</option><option>CRYPTO</option><option>INDICES</option></select></div>
+<div class="grid grid-cols-2 gap-1 mt-1"><input id="adEntry" placeholder="Entry" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"><input id="adSL" placeholder="SL" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"><input id="adTP1" placeholder="TP1" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"><input id="adTP2" placeholder="TP2" class="bg-[#0e0e10] border border-[#2a2a2e] rounded px-2 py-1 text-xs"></div>
+<button id="adAdd" class="w-full mt-2 bg-[#26a69a] py-1.5 rounded text-xs text-white font-bold">Add Signal + Telegram/WhatsApp</button></div>
+</div>
+<div id="tab-tools" class="hidden flex-1 p-3 space-y-3 overflow-y-auto">
+<div class="bg-[#1e1e22] rounded p-3"><div class="text-xs font-bold mb-2">Risk Calculator</div><input id="rBalance" type="number" value="1000" class="w-full mb-1 bg-[#0e0e10] border rounded px-2 py-1 text-xs"><input id="rRisk" type="number" value="2" class="w-full mb-1 bg-[#0e0e10] border rounded px-2 py-1 text-xs"><input id="rSL" type="number" value="20" class="w-full mb-1 bg-[#0e0e10] border rounded px-2 py-1 text-xs"><button id="rCalc" class="w-full bg-zinc-700 py-1 rounded text-xs">Calculate</button><div id="rResult" class="mt-2 text-xs text-[#26a69a]"></div></div>
+<div class="bg-[#1e1e22] rounded p-3"><button id="pushBtn" class="w-full bg-[#f9a825] text-black py-1 rounded text-xs font-bold">Enable New Signal Alert</button></div>
+<div class="bg-[#1e1e22] rounded p-3 text-[10px] text-zinc-500"><button id="buyVip" class="w-full mt-2 bg-[#26a69a] py-1.5 rounded text-xs text-white">Pay VIP $10 Flutterwave</button><button id="buyVvip" class="w-full mt-1 bg-[#f9a825] py-1.5 rounded text-xs text-black font-bold">Buy VVIP $50</button></div>
+</div>
+</div>
+</div>
+<div id="authModal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center"><div class="bg-[#1a1a1d] border rounded-lg p-6 w-[320px]"><h3 class="text-white font-bold mb-4">GAZELLE Login</h3><input id="auUser" placeholder="Username" class="w-full mb-2 bg-[#0e0e10] border rounded px-3 py-2 text-sm"><input id="auPass" type="password" placeholder="Password" class="w-full mb-3 bg-[#0e0e10] border rounded px-3 py-2 text-sm"><button id="doLogin" class="w-full bg-[#26a69a] py-2 rounded text-white text-sm font-bold">Login</button><button id="doRegister" class="w-full mt-2 bg-zinc-700 py-2 rounded text-white text-sm">Register Free</button><button id="closeAuth" class="w-full mt-2 text-zinc-500 text-xs">Close</button><div id="authMsg" class="text-xs mt-2 text-red-400"></div></div></div>
+<script>
+let me=null; let signals=[]; let currentPair='EURUSD';
+function initChart(pair){ try{ new TradingView.widget({autosize:true,symbol:pair==="XAUUSD"?"OANDA:XAUUSD":pair==="BTCUSD"?"BINANCE:BTCUSDT":pair==="US30"?"FOREXCOM:DJI":"FX:"+pair, interval:"60", timezone:"Etc/UTC", theme:"dark", style:"1", locale:"en", toolbar_bg:"#1a1a1d", enable_publishing:false, container_id:"tradingview_chart"});}catch(e){ document.getElementById('tradingview_chart').innerHTML='<div class="flex items-center justify-center h-full text-zinc-500 text-xs">Chart: '+pair+'</div>'}}
+async function loadMe(){ const r=await fetch('/api/me'); const d=await r.json(); if(d.logged){ me=d; document.getElementById('userInfo').innerHTML=d.username+' <span class="bg-zinc-800 px-1 rounded ml-1">'+d.tier+'</span>'; document.getElementById('authBtn').classList.add('hidden'); document.getElementById('logoutBtn').classList.remove('hidden'); document.getElementById('dashTier').innerText=d.tier; document.getElementById('dashExpiry').innerText=d.vip_expiry?`Expiry: ${d.vip_expiry}`:''; } else { me=null; document.getElementById('authBtn').classList.remove('hidden'); document.getElementById('logoutBtn').classList.add('hidden'); }}
+async function loadSignals(){ const r=await fetch('/api/signals'); const d=await r.json(); signals=d.signals; document.getElementById('realStats').innerText=`Win: ${d.stats.win_rate}% | Total: ${d.stats.total} | TP: ${d.stats.tp_hit}`; const q=document.getElementById('searchPair').value.toUpperCase(); const list=document.getElementById('signalList'); list.innerHTML=''; signals.filter(s=>!q||s.pair.includes(q)).forEach(s=>{ const row=document.createElement('div'); row.className='flex items-center px-2 py-2 border-b border-[#1e1e22] cursor-pointer text-[11px] '+(s.locked?'opacity-40':''); row.innerHTML=`<span class="w-20 font-bold ${s.action==='BUY'?'text-[#26a69a]':'text-red-400'}">${s.pair} ${s.locked?'🔒':''}</span><span class="flex-1">${s.entry} <span class="text-[9px] ${s.status==='TP Hit'?'text-green-400':s.status==='SL Hit'?'text-red-400':'text-zinc-500'}">${s.status}</span></span><span class="${s.action==='BUY'?'text-green-400':'text-red-400'}">${s.action}</span>`; row.onclick=()=>{ if(s.locked){ alert('VIP $10 required for '+s.category); return;} currentPair=s.pair; initChart(s.pair); showDetails(s); }; list.appendChild(row); }); }
+function showDetails(s){ document.getElementById('signalDetails').innerHTML=`<div class="flex justify-between"><div><div class="text-white font-bold text-sm">${s.pair} <span class="text-[10px] px-1.5 py-0.5 rounded ${s.action==='BUY'?'bg-[#26a69a]':'bg-red-500'} text-white ml-2">${s.action}</span> <span class="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded ml-1">${s.timeframe} ${s.trade_type} ${s.status}</span></div><div class="text-[11px] text-zinc-500 mt-1">By ${s.created_by} at ${s.created_at} | Conf ${s.confidence}%</div></div><button onclick="navigator.clipboard.writeText('${s.entry}')" class="bg-zinc-800 px-3 py-1 rounded text-xs">Copy</button></div><div class="grid grid-cols-4 gap-2 mt-4"><div class="bg-[#0e0e10] border rounded p-2"><div class="text-[10px] text-zinc-500">ENTRY</div><div class="text-sm text-white font-mono">${s.entry}</div></div><div class="bg-[#0e0e10] border border-red-900/30 rounded p-2"><div class="text-[10px] text-red-400">SL</div><div class="text-sm text-red-400 font-mono">${s.sl}</div></div><div class="bg-[#0e0e10] border border-green-900/30 rounded p-2"><div class="text-[10px] text-green-400">TP1</div><div class="text-sm text-green-400 font-mono">${s.tp1}</div></div><div class="bg-[#0e0e10] border rounded p-2"><div class="text-[10px] text-green-400">TP2/3</div><div class="text-sm text-white font-mono">${s.tp2}/${s.tp3}</div></div></div>`; }
+async function loadNews(){ const r=await fetch('/api/news'); const d=await r.json(); document.getElementById('newsList').innerHTML=d.map(n=>`<div class="flex gap-1 text-[10px] bg-[#0e0e10] rounded px-1 py-1"><span class="text-zinc-500">${n.time}</span><span class="font-bold">${n.pair}</span><span class="flex-1 truncate">${n.event}</span><span class="bg-red-500 text-white px-1 rounded text-[8px]">${n.impact}</span></div>`).join(''); }
+async function loadComments(){ const r=await fetch('/api/comments'); const d=await r.json(); document.getElementById('commentList').innerHTML=d.map(c=>`<div class="bg-[#0e0e10] rounded p-2"><div class="flex justify-between"><span class="font-bold text-white">${c.username}</span><span class="text-[10px] text-zinc-500">${c.pair} ${c.time}</span></div><div class="text-zinc-300 mt-1">${c.message}</div></div>`).join(''); }
+async function loadLeader(){ const r=await fetch('/api/leaderboard'); const d=await r.json(); document.getElementById('leaderboard').innerHTML=d.map(l=>`${l.username} (${l.wins})`).join(', '); }
+document.getElementById('searchPair').addEventListener('input', loadSignals);
+document.querySelectorAll('.tabBtn').forEach(b=>b.addEventListener('click',()=>{ document.querySelectorAll('.tabBtn').forEach(x=>{x.classList.remove('bg-[#1e1e22]','text-white'); x.classList.add('text-zinc-500')}); b.classList.add('bg-[#1e1e22]','text-white'); document.getElementById('tab-community').classList.add('hidden'); document.getElementById('tab-dashboard').classList.add('hidden'); document.getElementById('tab-tools').classList.add('hidden'); document.getElementById('tab-'+b.dataset.tab).classList.remove('hidden'); }));
+document.getElementById('authBtn').onclick=()=>document.getElementById('authModal').classList.remove('hidden');
+document.getElementById('closeAuth').onclick=()=>document.getElementById('authModal').classList.add('hidden');
+document.getElementById('doLogin').onclick=async()=>{ const u=document.getElementById('auUser').value, p=document.getElementById('auPass').value; const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})}); const d=await r.json(); if(d.success){ document.getElementById('authModal').classList.add('hidden'); loadMe(); loadSignals(); } else document.getElementById('authMsg').innerText='Invalid'; };
+document.getElementById('doRegister').onclick=async()=>{ const u=document.getElementById('auUser').value, p=document.getElementById('auPass').value; const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})}); const d=await r.json(); if(d.success){ document.getElementById('authModal').classList.add('hidden'); loadMe(); } else document.getElementById('authMsg').innerText=d.error; };
+document.getElementById('logoutBtn').onclick=async()=>{ await fetch('/api/logout',{method:'POST'}); loadMe(); loadSignals(); };
+document.getElementById('sendComment').onclick=async()=>{ const msg=document.getElementById('commentInput').value; const r=await fetch('/api/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,pair:'GENERAL'})}); const d=await r.json(); if(d.success){ document.getElementById('commentInput').value=''; loadComments(); } else alert(d.error); };
+document.getElementById('rCalc').onclick=async()=>{ const bal=document.getElementById('rBalance').value, risk=document.getElementById('rRisk').value, sl=document.getElementById('rSL').value; const r=await fetch('/api/calculate-risk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:bal,risk_percent:risk,sl_pips:sl})}); const d=await r.json(); document.getElementById('rResult').innerText=`Risk $${d.risk_money} -> Lot ${d.lot_size}`; };
+document.getElementById('adAdd').onclick=async()=>{ const data={pair:document.getElementById('adPair').value, action:document.getElementById('adAction').value, category:document.getElementById('adCat').value, entry:document.getElementById('adEntry').value, sl:document.getElementById('adSL').value, tp1:document.getElementById('adTP1').value, tp2:document.getElementById('adTP2').value}; const r=await fetch('/api/admin/add-signal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); const d=await r.json(); if(d.success){ alert('Added'); loadSignals(); } else alert(d.error); };
+document.getElementById('buyVip').onclick=async()=>{ const r=await fetch('/api/vip/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tier:'VIP'})}); const d=await r.json(); if(d.success){ alert('VIP Active!'); loadMe(); loadSignals(); } };
+document.getElementById('buyVvip').onclick=async()=>{ const r=await fetch('/api/vip/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tier:'VVIP'})}); const d=await r.json(); if(d.success){ alert('VVIP $50 Active!'); loadMe(); loadSignals(); } };
+document.getElementById('pushBtn').onclick=()=>{ if('Notification' in window){ Notification.requestPermission().then(p=>{ if(p==='granted') new Notification('GAZELLE PRO',{body:'New Signal!'}); }); } };
+let cd=900; setInterval(()=>{ cd--; if(cd<0) cd=900; const m=Math.floor(cd/60), s=cd%60; document.getElementById('countdown').innerText=`00:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; },1000);
+loadMe(); loadSignals(); loadNews(); loadComments(); loadLeader(); initChart('EURUSD');
+setInterval(()=>{ loadSignals(); loadNews(); },30000);
+</script>
+</body>
+  </html> 
