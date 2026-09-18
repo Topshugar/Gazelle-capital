@@ -37,3 +37,29 @@ HEAD = """
 </nav><div>
 """
 FOOT = """</div><footer class="border-t mt-24 py-10 text-center text-slate-400 text-[12px] bg-white">© 2026 Gazelle Capital</footer></body></html>"""
+@app.route("/")
+def home():
+    sigs = [engine(s) for s in ["EURUSD","GBPUSD","GBPJPY","XAUUSD"]]
+    rows = "".join([f"<div class='flex justify-between py-2.5 border-b text-[13px]'><span class='font-[600]'>{d['symbol']} {d['signal']}</span><span class='text-slate-500'>Entry {d['price']} SL {d['sl']}</span></div>" for d in sigs])
+    body = f"""<div class="px-6 max-w-[1200px] mx-auto"><div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 pt-14"><div><div class="bg-blue-50 border border-blue-100 rounded-full px-3 py-1 text-[11px] font-[700] text-blue-700 inline-flex">Now live {date.today().isoformat()}</div><h1 class="text-[42px] font-[800] leading-[0.95] mt-5">Invest with<br>Institutional Precision</h1><p class="text-slate-500 text-[15px] mt-5">Real-time data, locked daily signals, fundamental reasoning.</p><div class="flex gap-3 mt-7"><a href="/register" class="bg-[#2563eb] text-white px-6 py-3 rounded-full font-[700] text-[13px]">Start Free Trial</a><a href="/signals" class="bg-white border px-6 py-3 rounded-full font-[600] text-[13px]">View Signals</a></div></div><div class="bg-white border rounded-[20px] p-5"><div class="font-[700] text-[12px]">D1 Signals {date.today().isoformat()} LIVE</div><div class="mt-4 bg-slate-50 rounded-[12px] p-1">{rows}</div></div></div><div class="mt-20"><h2 class="text-[22px] font-[800] text-center">Simple Pricing</h2><div class="grid md:grid-cols-3 gap-6 mt-8"><div class="bg-white border rounded-[20px] p-6"><div class="font-[700] text-blue-700">Starter</div><div class="text-[36px] font-[800]">$0</div><a href="/register" class="block mt-6 bg-white border text-center py-2.5 rounded-full text-[13px] font-[700]">Get Started Free</a></div><div class="bg-white border-2 border-[#2563eb] rounded-[20px] p-6"><div class="font-[700] text-blue-700">Pro $10</div><div class="text-[36px] font-[800]">$10</div><a href="/register" class="block mt-6 bg-[#2563eb] text-white text-center py-2.5 rounded-full text-[13px] font-[700]">Start Pro</a></div><div class="bg-white border rounded-[20px] p-6"><div class="font-[700] text-blue-700">Enterprise</div><div class="text-[36px] font-[800]">$99</div><a href="/register" class="block mt-6 bg-white border text-center py-2.5 rounded-full text-[13px] font-[700]">Contact Sales</a></div></div></div></div>"""
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/news")
+def news():
+    body = f"""<div class="px-6 max-w-[1100px] mx-auto pt-10"><h1 class="text-[28px] font-[800]">Market Brief & Why Today's Signals</h1><p class="text-slate-500 text-[13px]">Real fundamental drivers. No indicators.</p><div class="mt-8 space-y-3"><div class="bg-white border rounded-[16px] p-5"><h3 class="font-[700] text-[14px]">GBPJPY BUY $210.50: BoJ dovish + UK wage 6.2%</h3><p class="text-slate-500 text-[12px] mt-2">Why BUY: GBP resilience + JPY outflow. SL $207.50 BE $211.559</p></div><div class="bg-white border rounded-[16px] p-5"><h3 class="font-[700] text-[14px]">USDJPY: US CPI sticky 3.4% Fed hawkish</h3></div><div class="bg-white border rounded-[16px] p-5"><h3 class="font-[700] text-[14px]">XAUUSD Gold $2518 central bank buying</h3></div></div></div>"""
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/signals")
+def signals_page():
+    rows=""
+    for s in REAL:
+        d=engine(s)
+        rows+=f"<a href='/signals/{s}' class='bg-white border rounded-[14px] p-4 flex justify-between'><div><div class='font-[700]'>{s}</div><div class='text-[11px] text-slate-500'>{d['reason'][:50]}...</div></div><div><div class='font-[700]'>${d['price']}</div><div class='text-[10px] bg-green-50 text-green-700 px-2 py-1 rounded-full'>{d['signal']}</div></div></a>"
+    body=f"<div class='px-6 max-w-[900px] mx-auto pt-8'><h1 class='text-[24px] font-[800]'>Professional D1 Signals</h1><div class='grid gap-3 mt-6'>{rows}</div></div>"
+    return render_template_string(HEAD + body + FOOT)
+
+@app.route("/signals/<symbol>")
+def detail(symbol):
+    d=engine(symbol.upper())
+    body=f"<div class='px-6 max-w-[760px] mx-auto pt-8'><a href='/signals' class='text-[12px] bg-white border px-3 py-1.5 rounded-full'>Back</a><div class='mt-5 bg-white border rounded-[20px] p-6'><h1 class='text-[26px] font-[800]'>{symbol.upper()} {d['signal']}</h1><div class='mt-6 bg-blue-50 border rounded-[14px] p-4'><div class='text-[10px] font-[700] text-blue-700'>WHY THIS TRADE</div><p class='text-[13px] mt-2'>{d['reason']}</p></div><div class='grid grid-cols-3 gap-3 mt-5'><div class='bg-slate-50 border rounded-[14px] p-4'><div class='text-[10px]'>ENTRY</div><div class='font-[800]'>${d['price']}</div></div><div class='bg-red-50 border rounded-[14px] p-4'><div class='text-[10px]'>SL</div><div class='font-[800]'>${d['sl']}</div></div><div class='bg-green-50 border rounded-[14px] p-4'><div class='text-[10px]'>BE</div><div class='font-[800]'>${d['be']}</div></div></div></div></div>"
+    return render_template_string(HEAD + body + FOOT)
