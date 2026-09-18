@@ -2,70 +2,106 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gazelle Pro MT5</title>
+<title>Gazelle Capital - MT5 Signals</title>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
 <style>
-body{background:#0a0e14;color:#fff;font-family:Arial;margin:0;padding:20px;text-align:center}
-h1{color:#00ff88}
-.card{background:#151a23;padding:20px;border-radius:12px;max-width:500px;margin:15px auto;border:1px solid #222}
-.btn{padding:12px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin:5px}
-.free{background:#00ff88;color:#000}
-.vip{background:gold;color:#000}
-.vvip{background:purple;color:#fff}
-.signal{border-left:4px solid #00ff88;text-align:left;padding:10px}
-.locked{opacity:0.4;filter:blur(3px)}
-input{padding:10px;width:80%;margin:5px;border-radius:6px;border:none}
+body{background:#0a0e14;color:#fff;font-family:Arial;margin:0}
+header{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;background:#111;border-bottom:1px solid #222}
+.logo{color:#00ff88;font-weight:bold;font-size:20px}
+.nav a{color:#fff;text-decoration:none;margin-left:15px}
+.nav .btn{padding:8px 16px;border-radius:20px;font-weight:bold}
+.login{color:#aaa}
+.start{background:#00ff88;color:#000}
+.card{background:#151a23;padding:20px;border-radius:12px;max-width:500px;margin:20px auto;border:1px solid #222;text-align:center}
+.signal{border-left:4px solid #00ff88;text-align:left;padding:12px;margin:10px 0;background:#0f141e;border-radius:8px}
+.locked{opacity:0.5;filter:blur(4px);pointer-events:none}
+.free{background:#00ff88;color:#000;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
+.vip{background:gold;color:#000;padding:12px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;width:100%}
+input{padding:12px;width:90%;margin:8px 0;border-radius:8px;border:none;background:#222;color:#fff}
 </style>
 </head>
 <body>
-<h1>GAZELLE PRO MT5</h1>
-<p>Lagos - 85% Accuracy Signals</p>
 
-<div class="card" id="auth">
-<h3>Login / Register</h3>
+<header>
+<div class="logo">GAZELLE CAPITAL</div>
+<div class="nav">
+{% if logged_in %}
+  <span style="color:#00ff88">Hi, {{ username }} ({{ tier }})</span>
+  <a href="/logout" class="btn start">Logout</a>
+{% else %}
+  <a href="#" onclick="document.getElementById('auth').scrollIntoView()" class="login">Log in</a>
+  <a href="#" onclick="document.getElementById('auth').scrollIntoView()" class="btn start">Get Started</a>
+{% endif %}
+</div>
+</header>
+
+<div class="card" id="auth" {% if logged_in %} style="display:none" {% endif %}>
+<h3 style="color:#00ff88">Login / Register</h3>
 <input id="u" placeholder="Username">
 <input id="p" type="password" placeholder="Password">
 <br>
-<button class="btn free" onclick="reg()">Register</button>
-<button class="btn free" onclick="log()">Login</button>
-<p id="msg"></p>
+<button class="free" onclick="reg()">Register</button>
+<button class="free" onclick="log()">Login</button>
+<p id="msg" style="color:gold"></p>
 </div>
 
+{% if logged_in %}
 <div class="card">
-<h3>Signals</h3>
-<div id="signals">Loading...</div>
+<h2>Welcome {{ username }}!</h2>
+<p>Your Tier: <b style="color:gold">{{ tier }}</b></p>
+<p id="status">Lagos - Live Signals</p>
 </div>
+{% endif %}
 
 <div class="card">
-<h3>Upgrade</h3>
-<p>VIP - ₦15,000/month - Gold, XAU, 92% accuracy</p>
-<button class="btn vip" onclick="pay('VIP')">Pay VIP with Flutterwave</button>
-<p>VVIP - ₦30,000/month - All pairs + EA</p>
-<button class="btn vvip" onclick="pay('VVIP')">Pay VVIP with Flutterwave</button>
+<h3>Live Signals - 85% Accuracy</h3>
+<div id="signals">Loading signals...</div>
+</div>
+
+<div class="card" id="paycard">
+<h3>Upgrade to VIP - $10 Global</h3>
+<p>Unlock Gold XAUUSD 92% accuracy + Bot</p>
+<p style="font-size:12px;color:#888">Flutterwave - Worldwide Payment</p>
+<button class="vip" onclick="payVIP()">Pay $10 with Flutterwave</button>
+<p style="font-size:11px;color:#555;margin-top:10px">After payment, VIP unlocks automatically</p>
 </div>
 
 <script>
-let tier='FREE';
+let currentTier = "{{ tier }}";
+const FLW_KEY = "{{ flw_key }}";
+
 async function reg(){
  let r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});
- let d=await r.json(); msg.innerText=d.ok?'Registered! Now login':d.error;
+ let d=await r.json(); msg.innerText=d.ok?'Registered! Now Login':d.error; if(d.ok) setTimeout(()=>location.reload(),1000);
 }
 async function log(){
  let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});
- let d=await r.json(); if(d.ok){tier=d.tier; msg.innerText='Logged in as '+tier; loadSignals()} else msg.innerText=d.error;
+ let d=await r.json(); if(d.ok){ location.reload(); } else msg.innerText=d.error;
 }
 async function loadSignals(){
  let r=await fetch('/api/signals'); let data=await r.json();
- let html=''; data.forEach(s=>{
-   let locked = (s.tier=='VIP' && tier=='FREE') || (s.tier=='VVIP' && tier!='VVIP');
-   html+=`<div class="card signal ${locked?'locked':''}"><b>${s.pair} - ${s.action}</b><br>Entry: ${s.entry} | SL: ${s.sl} | TP: ${s.tp}<br>Accuracy: ${s.accuracy} - ${s.tier} ${locked?'🔒':''}</div>`;
+ let html=''; data.signals.forEach(s=>{
+   let locked = (s.tier=='VIP' && data.user_tier=='FREE') || (s.tier=='VVIP' && data.user_tier!='VVIP');
+   html+=`<div class="signal ${locked?'locked':''}"><b>${s.pair} - ${s.action} ${locked?'🔒 VIP ONLY':''}</b><br>Entry: ${s.entry} | SL: ${s.sl} | TP: ${s.tp}<br><small>Accuracy: ${s.accuracy} - ${s.tier}</small></div>`;
  });
- signals.innerHTML=html;
+ document.getElementById('signals').innerHTML=html;
 }
-function pay(t){
- alert('Flutterwave for '+t+' - Add your Flutterwave link here. After payment DM admin on WhatsApp to upgrade.');
- window.open('https://flutterwave.com/pay/YOUR_LINK_HERE','_blank');
+
+function payVIP(){
+ FlutterwaveCheckout({
+   public_key: FLW_KEY,
+   tx_ref: "gazelle-"+Date.now(),
+   amount: 10,
+   currency: "USD",
+   payment_options: "card, mobilemoney, ussd, banktransfer",
+   customer: { email: "{{ username }}@gazelle.com", name: "{{ username }}" },
+   customizations: { title: "Gazelle VIP $10", description: "VIP Signals Access" },
+   callback: function(data){
+     fetch('/api/verify-flutterwave',{method:'POST'}).then(()=>{ alert("✅ VIP Unlocked!"); location.reload(); });
+   }
+ });
 }
 loadSignals();
 </script>
 </body>
-  </html>
+ </html>
